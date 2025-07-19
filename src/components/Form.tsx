@@ -130,7 +130,7 @@ function Form() {
 		}
 		const payload = { ...formData };
 		try {
-			const response = await fetch(import.meta.env.VITE_WORKER_URL, {
+			const response = await fetch("/form-handler", {
 				method: "POST",
 				headers: { "Content-Type": "application/json" },
 				body: JSON.stringify(payload),

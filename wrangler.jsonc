@@ -1,0 +1,24 @@
+{
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "101week-contracts",
+	"pages_build_output_dir": "dist",
+	"compatibility_date": "2025-07-19",
+	"observability": {
+		"enabled": true
+	},
+	"kv_namespaces": [
+		{
+			"binding": "_101WEEK_CONTRACTS_KV",
+			"id": "872736de53c24d19b09570f02a80e859"
+		}
+	],
+	"r2_buckets": [
+		{
+			"binding": "R2",
+			"bucket_name": "101week-contracts"
+		}
+	],
+	"vars": {
+		"NODE_VERSION": "20"
+	}
+}
