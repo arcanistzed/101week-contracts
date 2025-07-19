@@ -9,6 +9,7 @@ function App() {
 	const [language, setLanguage] = useState<"en" | "fr">(
 		(i18n.language as "en" | "fr") || "en",
 	);
+	const [submitted, setSubmitted] = useState(false);
 
 	const handleLanguageChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
 		const lang = e.target.value as "en" | "fr";
@@ -51,8 +52,8 @@ function App() {
 			</header>
 
 			<main className="main">
-				<Form />
-				<PDFPreview language={language} />
+				<Form submitted={submitted} setSubmitted={setSubmitted} />
+				{!submitted && <PDFPreview language={language} />}
 			</main>
 		</div>
 	);

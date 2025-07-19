@@ -16,7 +16,12 @@ function isEighteenOrOlder(dob: string): boolean {
 	return age >= 18;
 }
 
-function Form() {
+interface FormProps {
+	submitted: boolean;
+	setSubmitted: (v: boolean) => void;
+}
+
+function Form({ submitted, setSubmitted }: FormProps) {
 	const { t } = useTranslation();
 	const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 	const [formData, setFormData] = useState({
@@ -44,7 +49,6 @@ function Form() {
 	});
 	const [isAdult, setIsAdult] = useState(true);
 	const [errors, setErrors] = useState<{ [key: string]: string }>({});
-	const [submitted, setSubmitted] = useState(false);
 	const [submitting, setSubmitting] = useState(false);
 
 	const LOCAL_STORAGE_KEY = "101week-contracts.form.v1";
@@ -189,11 +193,6 @@ function Form() {
 				</div>
 			) : (
 				<form onSubmit={handleSubmit} className="form">
-					{errors.form && (
-						<div className="form-error" role="alert">
-							{errors.form}
-						</div>
-					)}
 					<fieldset className="form-section columns">
 						<legend>{t("form.biographical.title")}</legend>
 						<TextInput
@@ -279,7 +278,6 @@ function Form() {
 							</div>
 						)}
 					</fieldset>
-
 					<fieldset className="form-section">
 						<legend>{t("form.academic.title")}</legend>
 						<TextInput
@@ -333,7 +331,6 @@ function Form() {
 							</div>
 						</div>
 					</fieldset>
-
 					<fieldset className="form-section columns">
 						<legend>{t("form.contact.title")}</legend>
 						<TextInput
@@ -379,7 +376,6 @@ function Form() {
 							</div>
 						)}
 					</fieldset>
-
 					<fieldset className="form-section">
 						<legend>{t("form.health.title")}</legend>
 						<TextArea
@@ -408,7 +404,6 @@ function Form() {
 							onChange={handleChange}
 						/>
 					</fieldset>
-
 					<fieldset className="form-section columns">
 						<legend>{t("form.emergency.title")}</legend>
 						<TextInput
@@ -457,7 +452,6 @@ function Form() {
 							onChange={handleChange}
 						/>
 					</fieldset>
-
 					<fieldset className="form-section">
 						<legend>{t("form.signature.title")}</legend>
 						<p>
@@ -498,7 +492,6 @@ function Form() {
 							<b>{t("form.signature.agreement")}</b>
 						</p>
 					</fieldset>
-
 					<fieldset className="form-section">
 						<TextInput
 							label={t("form.participant.fullName")}
@@ -536,7 +529,6 @@ function Form() {
 							aria-readonly="true"
 						/>
 					</fieldset>
-
 					{!isAdult && (
 						<fieldset className="form-section">
 							<legend>{t("form.parent.title")}</legend>
@@ -596,10 +588,14 @@ function Form() {
 							/>
 						</fieldset>
 					)}
-
 					<button type="submit" disabled={submitting}>
 						{t("form.submit")}
 					</button>
+					{errors.form && (
+						<div className="form-error" role="alert">
+							{errors.form}
+						</div>
+					)}
 				</form>
 			)}
 		</>

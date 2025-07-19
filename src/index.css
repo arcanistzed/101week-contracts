@@ -250,6 +250,26 @@ textarea:focus-visible {
 	-webkit-appearance: radio;
 }
 
+.form-error {
+	color: #b00;
+	font-weight: 600;
+}
+
+.form-error::before {
+	content: "⚠️ ";
+}
+
+.form-success {
+	color: #217a3c;
+	font-weight: 600;
+	margin: auto;
+	font-size: 1.5rem;
+}
+
+.form-success::before {
+	content: "✓ ";
+}
+
 @media (max-width: 700px) {
 	.app {
 		padding: 0.5rem;
