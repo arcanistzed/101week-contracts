@@ -139,6 +139,15 @@ button[type="submit"] {
 	color: white;
 }
 
+button[type="submit"]:hover,
+button[type="submit"]:focus-visible {
+	background-color: #005fa3;
+}
+
+button[type="submit"]:active {
+	background-color: #00497a;
+}
+
 button,
 input,
 select,
