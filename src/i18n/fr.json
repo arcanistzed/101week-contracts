@@ -1,0 +1,89 @@
+{
+	"title": "Portail de signature numérique",
+	"form": {
+		"biographical": {
+			"title": "INFORMATIONS BIOGRAPHIQUES",
+			"dob": "Date de naissance",
+			"firstName": "Prénom",
+			"languages": "Langue(s)",
+			"lastName": "Nom de famille",
+			"pronouns": "Pronoms"
+		},
+		"academic": {
+			"title": "Programme académique",
+			"program": "Programme",
+			"rsg": {
+				"1": "Gouvernement étudiant reconnu (1)",
+				"2": "Gouvernement étudiant reconnu (2)",
+				"explanation": "Les étudiant·e·s en double majeure peuvent s’inscrire à la Semaine 101 de l’un ou l’autre des GÉR, ou aux deux. Les étudiant·e·s des Premières Nations, Métis et Inuit peuvent s’inscrire à la Semaine 101 du GÉR de leur programme et/ou à celle de l’Association des étudiant·e·s autochtones.",
+				"question": "Auprès de quel(s) Gouvernement(s) étudiant(s) reconnu(s) (GÉR) vous êtes-vous inscrit·e pour la Semaine 101?"
+			}
+		},
+		"contact": {
+			"title": "Coordonnées",
+			"email": "Courriel",
+			"phone": "Numéro de téléphone"
+		},
+		"health": {
+			"title": "Informations médicales",
+			"accessibility": "Demandes d’accessibilité",
+			"medical": "Restrictions / limitations / informations médicales pertinentes (veuillez joindre un document si nécessaire) :"
+		},
+		"emergency": {
+			"title": "PERSONNE CONTACT EN CAS D’URGENCE",
+			"name": "Nom",
+			"phone": "Numéro de téléphone",
+			"relationship": "Relation"
+		},
+		"signature": {
+			"title": "PAGE DE SIGNATURE",
+			"legal": "CE DOCUMENT A UNE INCIDENCE SUR VOS DROITS LÉGAUX. LISEZ-LE ATTENTIVEMENT. SI VOUS NE SOUHAITEZ PAS RENONCER À VOS DROITS LÉGAUX, NE SIGNEZ PAS CE DOCUMENT ET NE PARTICIPEZ PAS À CES ACTIVITÉS.",
+			"preamble": "Je, ci-après « la personne participante », <b>ACCEPTE ET RECONNAÎT PAR LA PRÉSENTE</b> avoir lu, compris et accepté toutes les conditions contenues dans les codes, les politiques, la décharge et la renonciation suivantes et les autres documents du Syndicat étudiant de l’Université d’Ottawa :",
+			"read": [
+				"Code de la Semaine 101 du SÉUO",
+				"Politique de contrôle des sacs",
+				"Avis de non-responsabilité en matière d’assurance et médical",
+				"Conditions diverses",
+				"Renonciation, décharge et indemnité pour la Semaine 101"
+			],
+			"copies": "La personne participante <b>ACCEPTE ET RECONNAÎT</b> que des copies des documents susmentionnés sont disponibles à l’adresse <a>{{url}}</a> et ont été jointes à la page de signature.",
+			"copiesUrl": "https://www.seuo-uosu.com/fr/student-life/101-week",
+			"agreement": "J’AI LU ET COMPRIS LE PRÉSENT ACCORD ET J’ACCEPTE TOUTES LES CONDITIONS QU’IL CONTIENT :"
+		},
+		"participant": {
+			"date": "Date (AAAA-MM-JJ)",
+			"fullName": "Nom légal complet",
+			"signature": "Signature"
+		},
+		"parent": {
+			"title": "SI LA PERSONNE PARTICIPANTE A MOINS DE DIX-HUIT (18) ANS:",
+			"agreement": "En signant ci-dessous, le parent ou tuteur atteste qu’il/elle/iel <b>COMPREND ET ACCEPTE</b> les modalités et conditions énoncées aux présentes.",
+			"date": "Date (AAAA-MM-JJ)",
+			"fullName": "Nom légal complet",
+			"signature": "Signature"
+		},
+		"submit": "Soumettre",
+		"error": {
+			"required": "Ce champ est requis",
+			"email": "Veuillez entrer une adresse courriel valide",
+			"futureDate": "La date ne peut pas être dans le futur"
+		},
+		"success": "Merci! Votre soumission a été reçue."
+	},
+	"signature": {
+		"draw": "Dessiner",
+		"upload": "Téléverser",
+		"type": "Taper",
+		"typePlaceholder": "Tapez votre signature",
+		"clear": "Effacer la signature",
+		"canvasAria": "Zone de dessin de la signature",
+		"preview": "Aperçu de la signature",
+		"errorType": "Veuillez téléverser un fichier image valide.",
+		"errorSize": "L’image doit être inférieure à {{size}}.",
+		"errorLength": "La signature doit comporter {{max}} caractères ou moins."
+	},
+	"meta": {
+		"title": "Portail de signature numérique pour la Semaine 101 de l'AÉG",
+		"description": "Signez votre contrat pour la Semaine 101 de l'AÉG numériquement et en toute sécurité."
+	}
+}

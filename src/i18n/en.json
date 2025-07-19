@@ -1,0 +1,89 @@
+{
+	"title": "Digital Signature Portal",
+	"form": {
+		"biographical": {
+			"title": "Biographical Information",
+			"dob": "Date of Birth",
+			"firstName": "First Name",
+			"languages": "Language(s)",
+			"lastName": "Last Name",
+			"pronouns": "Pronouns"
+		},
+		"academic": {
+			"title": "Academic Information",
+			"program": "Program",
+			"rsg": {
+				"1": "1st Recognized Student Government",
+				"2": "2nd Recognized Student Government (if applicable)",
+				"explanation": "Double major students can register in either or both RSG’s 101 Week. First Nations, Metis, and Inuits students can register in their program’s RSG and/or the Indigenous Students’ Association 101 Week",
+				"question": "With which Recognized Student Government(s) (RSG) did you register for 101 Week?"
+			}
+		},
+		"contact": {
+			"title": "Contact Information",
+			"email": "Email",
+			"phone": "Phone Number"
+		},
+		"health": {
+			"title": "Health Information",
+			"accessibility": "Accessibility Requests",
+			"medical": "Relevant Medical Restrictions / Limitations / Information (please email documents to <a>internal@uottawaess.ca</a> if necessary):"
+		},
+		"emergency": {
+			"title": "Emergency Contact Info",
+			"name": "Name",
+			"phone": "Phone Number",
+			"relationship": "Relationship"
+		},
+		"signature": {
+			"title": "Signature Page",
+			"legal": "THIS DOCUMENT AFFECTS YOUR LEGAL RIGHTS. YOU MUST READ IT CAREFULLY. IF YOU DO NOT WISH TO WAIVE YOUR LEGAL RIGHTS, DO NOT SIGN THIS DOCUMENT AND DO NOT PARTICIPATE IN THESE ACTIVITIES.",
+			"preamble": "I, hereinafter referred to as « the Participant », <b>HEREBY AGREE AND ACKNOWLEDGE</b> having read, understood, and agreed to all terms and conditions contained in the following codes, policies, release, wavier, and otherwise of the University of Ottawa Student Union:",
+			"read": [
+				"UOSU 101 Week Code",
+				"Bag Checks Policy",
+				"Insurance and Medical Disclaimer",
+				"Miscellaneous",
+				"Waiver, Release and Indemnity for 101 Week"
+			],
+			"copies": "The Participant <b>FURTHER AGREES AND ACKNOWLEDGES</b> that copies of the above-listed documents are available online at <a>{{url}}</a> have been attached to the Signature Page.",
+			"copiesUrl": "https://www.seuo-uosu.com/student-life/101-week",
+			"agreement": "I HAVE READ AND UNDERSTOOD THIS AGREEMENT AND AGREE TO ALL CONDITIONS CONTAINED THEREIN:"
+		},
+		"participant": {
+			"date": "Date",
+			"fullName": "Full Legal Name",
+			"signature": "Signature"
+		},
+		"parent": {
+			"title": "PARTICIPANT IS UNDER EIGHTEEN (18) YEARS OLD:",
+			"agreement": "By signing the below, the parent/guardian warrants that they <b>UNDERSTAND AND AGREE</b> to the terms and conditions set out herein.",
+			"date": "Date",
+			"fullName": "Full Legal Name",
+			"signature": "Signature"
+		},
+		"submit": "Submit",
+		"error": {
+			"required": "This field is required",
+			"email": "Please enter a valid email address",
+			"futureDate": "Date cannot be in the future"
+		},
+		"success": "Thank you! Your submission has been received."
+	},
+	"signature": {
+		"draw": "Draw",
+		"upload": "Upload",
+		"type": "Type",
+		"typePlaceholder": "Type your signature",
+		"clear": "Clear signature",
+		"canvasAria": "Signature drawing area",
+		"preview": "Signature preview",
+		"errorType": "Please upload a valid image file.",
+		"errorSize": "Image must be less than {{size}}.",
+		"errorLength": "Signature must be {{max}} characters or fewer."
+	},
+	"meta": {
+		"title": "ESS 101 Week Digital Signature Portal",
+		"description": "Sign your ESS 101 Week contract digitally and securely."
+	}
+}
