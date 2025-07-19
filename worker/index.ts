@@ -3,12 +3,7 @@ export interface Env {
 	R2: R2Bucket;
 }
 
-export const onRequestPost = async (context: {
-	request: Request;
-	env: Env;
-}) => {
-	const { request, env } = context;
-
+const handleFormPost = async (request: Request, env: Env) => {
 	try {
 		const submission = (await request.json()) as Record<string, unknown>;
 
@@ -163,3 +158,17 @@ export const onRequestPost = async (context: {
 		return new Response("Bad Request: " + message, { status: 400 });
 	}
 };
+
+export default {
+	async fetch(request: Request, env: Env) {
+		const url = new URL(request.url);
+
+		if (url.pathname === "/form-handler" && request.method === "POST") {
+			return await handleFormPost(request, env);
+		}
+		if (url.pathname === "/" && request.method === "GET") {
+			return new Response("OK", { status: 200 });
+		}
+		return new Response("Method Not Allowed", { status: 405 });
+	},
+} satisfies ExportedHandler<Env>;

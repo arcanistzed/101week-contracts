@@ -1,39 +1,43 @@
 {
-  "name": "101week-contracts",
-  "private": true,
-  "version": "0.0.0",
-  "type": "module",
-  "scripts": {
-    "dev": "vite",
-    "build": "tsc -b && vite build",
-    "lint": "eslint .",
-    "preview": "vite preview",
-    "test": "vitest run --reporter verbose"
-  },
-  "dependencies": {
-    "@react-pdf-viewer/core": "^3.12.0",
-    "@react-pdf-viewer/default-layout": "^3.12.0",
-    "i18next": "^25.3.2",
-    "i18next-browser-languagedetector": "^8.2.0",
-    "react": "^19.1.0",
-    "react-dom": "^19.1.0",
-    "react-i18next": "^15.6.0",
-    "react-pdf": "^10.0.1",
-    "signature_pad": "^5.0.10"
-  },
-  "devDependencies": {
-    "@cloudflare/workers-types": "^4.20250719.0",
-    "@eslint/js": "^9.30.1",
-    "@types/react": "^19.1.8",
-    "@types/react-dom": "^19.1.6",
-    "@vitejs/plugin-react": "^4.6.0",
-    "eslint": "^9.30.1",
-    "eslint-plugin-react-hooks": "^5.2.0",
-    "eslint-plugin-react-refresh": "^0.4.20",
-    "globals": "^16.3.0",
-    "typescript": "~5.8.3",
-    "typescript-eslint": "^8.35.1",
-    "vite": "^7.0.4",
-    "vitest": "^3.2.4"
-  }
+	"name": "101week-contracts",
+	"private": true,
+	"version": "0.0.0",
+	"type": "module",
+	"scripts": {
+		"dev": "vite",
+		"build": "tsc -b && vite build",
+		"lint": "eslint .",
+		"preview": "npm run build && vite preview",
+		"test": "vitest run",
+		"deploy": "npm run build && wrangler deploy",
+		"cf-typegen": "wrangler types"
+	},
+	"dependencies": {
+		"@react-pdf-viewer/core": "^3.12.0",
+		"@react-pdf-viewer/default-layout": "^3.12.0",
+		"i18next": "^25.3.2",
+		"i18next-browser-languagedetector": "^8.2.0",
+		"react": "^19.1.0",
+		"react-dom": "^19.1.0",
+		"react-i18next": "^15.6.0",
+		"react-pdf": "^10.0.1",
+		"signature_pad": "^5.0.10"
+	},
+	"devDependencies": {
+		"@cloudflare/vite-plugin": "^1.9.6",
+		"@cloudflare/workers-types": "^4.20250719.0",
+		"@eslint/js": "^9.30.1",
+		"@types/react": "^19.1.8",
+		"@types/react-dom": "^19.1.6",
+		"@vitejs/plugin-react": "^4.6.0",
+		"eslint": "^9.30.1",
+		"eslint-plugin-react-hooks": "^5.2.0",
+		"eslint-plugin-react-refresh": "^0.4.20",
+		"globals": "^16.3.0",
+		"typescript": "~5.8.3",
+		"typescript-eslint": "^8.35.1",
+		"vite": "^7.0.4",
+		"vitest": "^3.2.4",
+		"wrangler": "^4.25.0"
+	}
 }
