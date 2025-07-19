@@ -3,12 +3,44 @@ export interface Env {
 	R2: R2Bucket;
 }
 
+interface Submission {
+	preferredLanguage: string;
+	firstName: string;
+	lastName: string;
+	email: string;
+	phone: string;
+	languages: string;
+	program: string;
+	rsg1: string;
+	rsg2?: string;
+	emergencyName: string;
+	emergencyPhone: string;
+	emergencyRelationship?: string;
+	dob?: string;
+	pronouns?: string;
+	medical?: string;
+	accessibility?: string;
+	fullNameParticipant?: string;
+	signatureParticipant?: string;
+	dateParticipant?: string;
+	fullNameParent?: string;
+	signatureParent?: string;
+	dateParent?: string;
+}
+
+const sanitize = (str: string) =>
+	str
+		.trim()
+		.toLowerCase()
+		.replace(/[^a-z0-9]/g, "_");
+
 const handleFormPost = async (request: Request, env: Env) => {
 	try {
-		const submission = (await request.json()) as Record<string, unknown>;
+		const submission = (await request.json()) as Submission;
 
 		// Validate required fields
-		const requiredFields = [
+		const requiredFields: (keyof Submission)[] = [
+			"preferredLanguage",
 			"firstName",
 			"lastName",
 			"email",
@@ -60,7 +92,10 @@ const handleFormPost = async (request: Request, env: Env) => {
 			isAdult = age >= 18;
 		}
 		if (!isAdult) {
-			const parentFields = ["fullNameParent", "signatureParent"];
+			const parentFields: (keyof Submission)[] = [
+				"fullNameParent",
+				"signatureParent",
+			];
 			for (const field of parentFields) {
 				if (
 					!submission[field] ||
@@ -74,12 +109,10 @@ const handleFormPost = async (request: Request, env: Env) => {
 			}
 		}
 
-		// Generate submission ID and timestamp
-		const id = crypto.randomUUID();
-		const timestamp = new Date().toISOString();
-		const kvKey = `submission:${id}`;
-
-		submission.submittedAt = timestamp;
+		const firstName = sanitize(submission.firstName);
+		const lastName = sanitize(submission.lastName);
+		const timestamp = Date.now();
+		const kvKey = `${firstName}_${lastName}_${timestamp}`;
 
 		// Save original base64 images for R2 upload, but only store R2 path in KV if image
 		const signaturePaths: Record<string, string | null> = {};
@@ -91,7 +124,7 @@ const handleFormPost = async (request: Request, env: Env) => {
 			typeof originalSignatureParticipant === "string" &&
 			originalSignatureParticipant.startsWith("data:image/png;base64,")
 		) {
-			signaturePaths.signatureParticipant = `${kvKey}-participant.png`;
+			signaturePaths.signatureParticipant = `${kvKey}_participant.png`;
 			delete submission.signatureParticipant;
 		} else {
 			signaturePaths.signatureParticipant = null;
@@ -101,15 +134,20 @@ const handleFormPost = async (request: Request, env: Env) => {
 			typeof originalSignatureParent === "string" &&
 			originalSignatureParent.startsWith("data:image/png;base64,")
 		) {
-			signaturePaths.signatureParent = `${kvKey}-parent.png`;
+			signaturePaths.signatureParent = `${kvKey}_parent.png`;
 			delete submission.signatureParent;
 		} else {
 			signaturePaths.signatureParent = null;
 		}
-		submission.signaturePaths = signaturePaths;
 
 		// Store the full submission in KV
-		await env._101WEEK_CONTRACTS_KV.put(kvKey, JSON.stringify(submission));
+		await env._101WEEK_CONTRACTS_KV.put(
+			kvKey,
+			JSON.stringify({
+				...submission,
+				signaturePaths,
+			}),
+		);
 
 		// Upload image signatures to R2 if present, with a size check
 		const MAX_IMAGE_SIZE = 1024 * 1024; // 1MB
@@ -150,7 +188,7 @@ const handleFormPost = async (request: Request, env: Env) => {
 			await env.R2.put(signaturePaths.signatureParent, binary);
 		}
 
-		return new Response(JSON.stringify({ ok: true, id }), {
+		return new Response(JSON.stringify({ ok: true, id: kvKey }), {
 			headers: { "Content-Type": "application/json" },
 		});
 	} catch (err: unknown) {
