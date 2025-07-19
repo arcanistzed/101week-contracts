@@ -22,7 +22,7 @@ interface FormProps {
 }
 
 function Form({ submitted, setSubmitted }: FormProps) {
-	const { t } = useTranslation();
+	const { t, i18n } = useTranslation();
 	const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
 	const [formData, setFormData] = useState({
 		firstName: "",
@@ -132,7 +132,12 @@ function Form({ submitted, setSubmitted }: FormProps) {
 			setSubmitting(false);
 			return;
 		}
-		const payload = { ...formData };
+		const payload = {
+			...formData,
+			preferredLanguage: i18n.language.toLowerCase().startsWith("fr")
+				? "FR"
+				: "EN",
+		};
 		try {
 			const response = await fetch("/form-handler", {
 				method: "POST",
