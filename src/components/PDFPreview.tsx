@@ -3,12 +3,12 @@ import { Viewer, Worker } from "@react-pdf-viewer/core";
 import "@react-pdf-viewer/core/lib/styles/index.css";
 
 interface PDFPreviewProps {
-	language: "en" | "fr";
+	language: string;
 }
 
 function PDFPreview({ language }: PDFPreviewProps) {
 	const pdfUrl = `/101er Contract 2025 ${
-		language === "en" ? "EN" : "FR"
+		language.toLowerCase().startsWith("fr") ? "FR" : "EN"
 	}.pdf`;
 
 	const [viewerKey, setViewerKey] = useState(0);
