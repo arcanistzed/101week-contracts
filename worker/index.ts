@@ -197,12 +197,37 @@ const handleFormPost = async (request: Request, env: Env) => {
 	}
 };
 
+const handleCheckExists = async (request: Request, env: Env) => {
+	const url = new URL(request.url);
+	const name = url.searchParams.get("name");
+	if (!name) {
+		return new Response("Missing 'name' query parameter", {
+			status: 400,
+		});
+	}
+	const normalized = name
+		.toLowerCase()
+		.replace(/[^a-z0-9]/g, "_")
+		.replace(/_+/g, "_")
+		.replace(/^_+|_+$/g, "");
+	const listResponse = await env._101WEEK_CONTRACTS_KV.list({
+		prefix: normalized + "_",
+	});
+	const exists = listResponse.keys && listResponse.keys.length > 0;
+	return new Response(JSON.stringify({ exists }), {
+		headers: { "Content-Type": "application/json" },
+	});
+};
+
 export default {
 	async fetch(request: Request, env: Env) {
 		const url = new URL(request.url);
 
 		if (url.pathname === "/form-handler" && request.method === "POST") {
 			return await handleFormPost(request, env);
+		}
+		if (url.pathname === "/check-exists" && request.method === "GET") {
+			return await handleCheckExists(request, env);
 		}
 		if (url.pathname === "/" && request.method === "GET") {
 			return new Response("OK", { status: 200 });

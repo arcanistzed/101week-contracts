@@ -47,13 +47,13 @@ interface Entry {
 
 dotenv.config();
 
-const CF_ACCOUNT_ID = process.env.CF_ACCOUNT_ID;
-const CF_NAMESPACE_ID = process.env.CF_NAMESPACE_ID;
-const CF_API_TOKEN = process.env.CF_API_TOKEN;
+const ACCOUNT_ID = process.env.ACCOUNT_ID;
+const NAMESPACE_ID = process.env.NAMESPACE_ID;
+const API_TOKEN = process.env.API_TOKEN;
 const R2_BASE_URL = process.env.R2_BASE_URL;
 const OUTPUT_DIR = "./output";
 
-if (!CF_ACCOUNT_ID || !CF_NAMESPACE_ID || !CF_API_TOKEN || !R2_BASE_URL) {
+if (!ACCOUNT_ID || !NAMESPACE_ID || !API_TOKEN || !R2_BASE_URL) {
 	throw new Error("Missing required env vars");
 }
 
@@ -72,12 +72,12 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3): Promise<T> {
 }
 
 async function fetchAllKeys(prefix?: string): Promise<string[]> {
-	let url = `https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${CF_NAMESPACE_ID}/keys`;
+	let url = `https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/storage/kv/namespaces/${NAMESPACE_ID}/keys`;
 	if (prefix) {
 		url += `?prefix=${encodeURIComponent(prefix)}`;
 	}
 	const res = await fetch(url, {
-		headers: { Authorization: `Bearer ${CF_API_TOKEN}` },
+		headers: { Authorization: `Bearer ${API_TOKEN}` },
 	});
 	const json = (await res.json()) as CloudflareKeysResponse;
 	return json.result.map(k => k.name);
@@ -85,9 +85,9 @@ async function fetchAllKeys(prefix?: string): Promise<string[]> {
 
 async function fetchEntry(key: string): Promise<Entry> {
 	const res = await fetch(
-		`https://api.cloudflare.com/client/v4/accounts/${CF_ACCOUNT_ID}/storage/kv/namespaces/${CF_NAMESPACE_ID}/values/${key}`,
+		`https://api.cloudflare.com/client/v4/accounts/${ACCOUNT_ID}/storage/kv/namespaces/${NAMESPACE_ID}/values/${key}`,
 		{
-			headers: { Authorization: `Bearer ${CF_API_TOKEN}` },
+			headers: { Authorization: `Bearer ${API_TOKEN}` },
 		},
 	);
 	return res.json() as Promise<Entry>;
