@@ -125,8 +125,9 @@ const handleFormPost = async (request: Request, env: Env) => {
 
 		const firstName = sanitize(submission.firstName);
 		const lastName = sanitize(submission.lastName);
+		const email = sanitize(submission.email);
 		const timestamp = Date.now();
-		const kvKey = `${firstName}_${lastName}_${timestamp}`;
+		const kvKey = `${firstName}_${lastName}_${email}_${timestamp}`;
 
 		// Save original base64 images for R2 upload, but only store R2 path in KV if image
 		const signaturePaths: Record<string, string | null> = {};
@@ -213,24 +214,65 @@ const handleFormPost = async (request: Request, env: Env) => {
 
 const handleCheckExists = async (request: Request, env: Env) => {
 	const url = new URL(request.url);
-	const name = url.searchParams.get("name");
-	if (!name) {
-		return new Response("Missing 'name' query parameter", {
+	const input = url.searchParams.get("input");
+	if (!input) {
+		return new Response("Missing 'input' query parameter", {
 			status: 400,
 		});
 	}
-	const normalized = name
-		.toLowerCase()
-		.replace(/[^a-z0-9]/g, "_")
-		.replace(/_+/g, "_")
-		.replace(/^_+|_+$/g, "");
-	const listResponse = await env._101WEEK_CONTRACTS_KV.list({
-		prefix: normalized + "_",
-	});
-	const exists = listResponse.keys && listResponse.keys.length > 0;
-	return new Response(JSON.stringify({ exists }), {
-		headers: { "Content-Type": "application/json" },
-	});
+	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+	let normalized: string;
+	let inputType: string;
+	let listResponse;
+	let matchingKeys;
+	if (emailRegex.test(input)) {
+		normalized = input
+			.toLowerCase()
+			.replace(/[^a-z0-9]/g, "_")
+			.replace(/_+/g, "_")
+			.replace(/^_+|_+$/g, "");
+		inputType = "email";
+		listResponse = await env._101WEEK_CONTRACTS_KV.list({
+			prefix: `_${normalized}_`,
+		});
+		matchingKeys = listResponse.keys;
+	} else {
+		const parts = input.trim().split(/\s+/);
+		if (parts.length !== 2) {
+			return new Response("Input must be a valid email or full name", {
+				status: 400,
+			});
+		}
+		const firstName = parts[0]
+			.toLowerCase()
+			.replace(/[^a-z0-9]/g, "_")
+			.replace(/_+/g, "_")
+			.replace(/^_+|_+$/g, "");
+		const lastName = parts[1]
+			.toLowerCase()
+			.replace(/[^a-z0-9]/g, "_")
+			.replace(/_+/g, "_")
+			.replace(/^_+|_+$/g, "");
+		normalized = `${firstName}_${lastName}_`;
+		inputType = "fullName";
+		listResponse = await env._101WEEK_CONTRACTS_KV.list({
+			prefix: normalized,
+		});
+		matchingKeys = listResponse.keys;
+	}
+	const exists = matchingKeys.length > 0;
+	return new Response(
+		JSON.stringify({
+			inputType,
+			input,
+			normalized,
+			matchingKeys: matchingKeys.map(key => key.name),
+			exists,
+		}),
+		{
+			headers: { "Content-Type": "application/json" },
+		},
+	);
 };
 
 export default {

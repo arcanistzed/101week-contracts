@@ -19,7 +19,7 @@ function Admin() {
 		}
 		try {
 			const resp = await fetch(
-				`/check-exists?name=${encodeURIComponent(trimmed)}`,
+				`/check-exists?input=${encodeURIComponent(trimmed)}`,
 			);
 			if (!resp.ok) throw new Error(await resp.text());
 			const data = await resp.json();
@@ -57,7 +57,9 @@ function Admin() {
 						gap: 12,
 					}}
 				>
-					<label htmlFor="check-input">Email or Name:</label>
+					<label htmlFor="check-input">
+						Email or Full Name (First Last):
+					</label>
 					<input
 						id="check-input"
 						type="text"
