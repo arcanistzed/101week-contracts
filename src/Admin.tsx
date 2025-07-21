@@ -1,25 +1,19 @@
 import { useState } from "react";
 import type { LookupResult } from "./types";
 
-// Types for migration report
 type MigratedItem = {
-	oldKey: string;
-	newKey: string;
-	emailIndexKey: string;
-	copiedR2?: string[];
-	updatedSignaturePaths?: Record<string, string | null>;
-	deleted?: boolean;
-	deletedR2?: string[];
+	key: string;
+	updatedFields: string[];
+	r2Paths: string[];
 };
-type SkippedItem = { oldKey: string; reason: string };
+type SkippedItem = { key: string; reason: string };
 type MigrationReportType = {
 	mode: string;
 	totalScanned: number;
-	migrated: MigratedItem[];
-	skipped: SkippedItem[];
 	totalMigrated: number;
 	totalSkipped: number;
-	skipReasons?: Record<string, number>;
+	migrated: MigratedItem[];
+	skipped: SkippedItem[];
 	logs?: string[];
 };
 
@@ -213,31 +207,7 @@ function Admin() {
 
 function MigrationTool() {
 	const [loading, setLoading] = useState(false);
-	const [mode, setMode] = useState<"dry-run" | "commit" | "delete">(
-		"dry-run",
-	);
-
-	type MigratedItem = {
-		oldKey: string;
-		newKey: string;
-		emailIndexKey: string;
-		copiedR2?: string[];
-		updatedSignaturePaths?: Record<string, string | null>;
-		deleted?: boolean;
-		deletedR2?: string[];
-	};
-	type SkippedItem = { oldKey: string; reason: string };
-	type MigrationReportType = {
-		mode: string;
-		totalScanned: number;
-		migrated: MigratedItem[];
-		skipped: SkippedItem[];
-		totalMigrated: number;
-		totalSkipped: number;
-		skipReasons?: Record<string, number>;
-		logs?: string[];
-	};
-
+	const [mode, setMode] = useState<"dry-run" | "commit">("dry-run");
 	const [report, setReport] = useState<MigrationReportType | null>(null);
 	const [error, setError] = useState<string | null>(null);
 
@@ -246,7 +216,7 @@ function MigrationTool() {
 		setReport(null);
 		setError(null);
 		try {
-			const resp = await fetch(`/migrate-keys?mode=${mode}`, {
+			const resp = await fetch(`/migrate-base64-to-r2?mode=${mode}`, {
 				method: "POST",
 			});
 			if (!resp.ok) {
@@ -272,15 +242,12 @@ function MigrationTool() {
 					id="migration-mode"
 					value={mode}
 					onChange={e =>
-						setMode(
-							e.target.value as "dry-run" | "commit" | "delete",
-						)
+						setMode(e.target.value as "dry-run" | "commit")
 					}
 					disabled={loading}
 				>
 					<option value="dry-run">Dry Run (no changes)</option>
 					<option value="commit">Commit (migrate data)</option>
-					<option value="delete">Delete (remove old keys)</option>
 				</select>
 			</div>
 			<button
@@ -290,8 +257,6 @@ function MigrationTool() {
 				style={{
 					background: loading
 						? "#ccc"
-						: mode === "delete"
-						? "#c0392b"
 						: mode === "commit"
 						? "#27ae60"
 						: "#e67e22",
@@ -337,20 +302,6 @@ function MigrationReport({ report }: { report: MigrationReportType }) {
 			<div>
 				<b>Total Skipped:</b> {report.totalSkipped}
 			</div>
-			{report.skipReasons && (
-				<div style={{ margin: "8px 0" }}>
-					<b>Skip Reasons:</b>
-					<ul style={{ margin: 0, paddingLeft: 20 }}>
-						{Object.entries(report.skipReasons).map(
-							([reason, count]) => (
-								<li key={reason}>
-									{reason}: {Number(count)}
-								</li>
-							),
-						)}
-					</ul>
-				</div>
-			)}
 			{Array.isArray(report.logs) && report.logs.length > 0 && (
 				<details style={{ marginTop: 8 }}>
 					<summary style={{ cursor: "pointer" }}>

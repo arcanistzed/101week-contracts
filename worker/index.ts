@@ -312,25 +312,24 @@ export default {
 			return await handleLookup(request, env);
 		}
 
-		// Robust migration endpoint: /migrate-keys?mode=dry-run|commit|delete
-		if (url.pathname === "/migrate-keys" && request.method === "POST") {
+		// Migration endpoint: /migrate-base64-to-r2?mode=dry-run|commit
+		if (
+			url.pathname === "/migrate-base64-to-r2" &&
+			request.method === "POST"
+		) {
 			try {
-				const mode = url.searchParams.get("mode") || "dry-run"; // dry-run (default), commit, delete
-				const migrated: Array<{
-					oldKey: string;
-					newKey: string;
-					emailIndexKey: string;
-					copiedR2?: string[];
-					updatedSignaturePaths?: Record<string, string | null>;
-					deleted?: boolean;
-					deletedR2?: string[];
-				}> = [];
-				const skipped: Array<{ oldKey: string; reason: string }> = [];
+				const mode = url.searchParams.get("mode") || "dry-run"; // dry-run (default), commit
 				let totalScanned = 0;
+				let totalMigrated = 0;
+				let totalSkipped = 0;
 				let cursor: string | undefined = undefined;
 				const logs: string[] = [];
-				const keyRegex =
-					/^([a-z0-9]+)_([a-z0-9]+)_([a-z0-9_]+)_(\d{13})$/i;
+				const migrated: Array<{
+					key: string;
+					updatedFields: string[];
+					r2Paths: string[];
+				}> = [];
+				const skipped: Array<{ key: string; reason: string }> = [];
 				while (true) {
 					let listResp: {
 						keys: { name: string }[];
@@ -354,243 +353,155 @@ export default {
 						logs.push(msg);
 						return new Response(msg, { status: 500 });
 					}
-					for (const { name: oldKey } of listResp.keys) {
+					for (const { name: key } of listResp.keys) {
+						// Skip index keys
+						if (key.startsWith("email_")) {
+							continue;
+						}
 						totalScanned++;
-						const match = oldKey.match(keyRegex);
-						if (!match) {
-							logs.push(
-								`Skipped key ${oldKey}: does not match migration pattern`,
-							);
-							continue;
-						}
-						logs.push(`Matches: ${match.map(m => m).join(", ")}`);
-						const [, firstName, lastName, email, timestamp] = match;
-						const newKey = `${firstName}_${lastName}_${timestamp}`;
-						const emailIndexKey = `email_${email}_${timestamp}`;
-						let exists: string | null = null;
-						try {
-							exists = await env._101WEEK_CONTRACTS_KV.get(
-								newKey,
-							);
-							if (exists)
-								logs.push(
-									`New key already exists for ${oldKey} -> ${newKey}`,
-								);
-						} catch (err) {
-							logs.push(
-								`Error checking existence of newKey ${newKey}: ${
-									err instanceof Error
-										? err.message
-										: String(err)
-								}`,
-							);
-						}
-						if (!exists && mode === "delete") {
-							skipped.push({
-								oldKey,
-								reason: "no new key for deletion",
-							});
-							logs.push(
-								`Skipped deletion for ${oldKey}: no new key exists`,
-							);
-							continue;
-						}
 						let value: string | null = null;
 						try {
-							value = await env._101WEEK_CONTRACTS_KV.get(oldKey);
+							value = await env._101WEEK_CONTRACTS_KV.get(key);
 						} catch (err) {
-							logs.push(
-								`Error fetching oldKey ${oldKey}: ${
-									err instanceof Error
-										? err.message
-										: String(err)
-								}`,
-							);
+							const msg = `Error fetching key ${key}: ${
+								err instanceof Error ? err.message : String(err)
+							}`;
+							logs.push(msg);
 						}
 						if (!value) {
-							skipped.push({
-								oldKey,
-								reason: "old key missing value",
-							});
-							logs.push(`Skipped ${oldKey}: missing value`);
+							const msg = `Key ${key} missing value in KV`;
+							logs.push(msg);
+							totalSkipped++;
+							skipped.push({ key, reason: "missing value" });
 							continue;
 						}
 						let parsed: unknown;
 						try {
 							parsed = JSON.parse(value);
 						} catch (err) {
-							skipped.push({
-								oldKey,
-								reason: "invalid JSON in value",
-							});
-							logs.push(
-								`Skipped ${oldKey}: invalid JSON (${
-									err instanceof Error
-										? err.message
-										: String(err)
-								})`,
-							);
+							const msg = `Invalid JSON for key ${key}: ${
+								err instanceof Error ? err.message : String(err)
+							}`;
+							logs.push(msg);
+							totalSkipped++;
+							skipped.push({ key, reason: "invalid JSON" });
 							continue;
 						}
-						type ParsedWithSignatures = {
-							signaturePaths?: Record<string, string | null>;
-							[key: string]: unknown;
-						};
-						const parsedObj = parsed as ParsedWithSignatures;
-						if (mode === "delete") {
-							const deletedR2: string[] = [];
-							for (const field of [
-								"signatureParticipant",
-								"signatureParent",
-							]) {
-								const oldPath =
-									parsedObj?.signaturePaths?.[field];
-								if (
-									typeof oldPath === "string" &&
-									oldPath.startsWith(oldKey)
-								) {
-									try {
-										await env.R2.delete(oldPath);
-										deletedR2.push(oldPath);
-										logs.push(
-											`Deleted R2 object: ${oldPath}`,
-										);
-									} catch (err) {
-										deletedR2.push(
-											`${oldPath} (delete error)`,
-										);
-										logs.push(
-											`Failed to delete R2 object: ${oldPath} (${
-												err instanceof Error
-													? err.message
-													: String(err)
-											})`,
-										);
-									}
-								}
-							}
-							try {
-								await env._101WEEK_CONTRACTS_KV.delete(oldKey);
-								logs.push(`Deleted oldKey: ${oldKey}`);
-							} catch (err) {
-								logs.push(
-									`Failed to delete oldKey: ${oldKey} (${
-										err instanceof Error
-											? err.message
-											: String(err)
-									})`,
-								);
-							}
-							migrated.push({
-								oldKey,
-								newKey,
-								emailIndexKey,
-								deleted: true,
-								deletedR2,
-							});
+						if (!isValidLookupData(parsed)) {
+							const msg = `Invalid data shape for key ${key}: ${JSON.stringify(
+								parsed,
+							)}`;
+							logs.push(msg);
+							totalSkipped++;
+							skipped.push({ key, reason: "invalid data shape" });
 							continue;
 						}
-						const copiedR2: string[] = [];
-						const updatedSignaturePaths: Record<
-							string,
-							string | null
-						> = {
-							...((parsedObj && parsedObj.signaturePaths) || {}),
-						};
+						// Ensure parsed is an object
+						if (!parsed || typeof parsed !== "object") {
+							const msg = `Parsed value for key ${key} is not an object: ${JSON.stringify(
+								parsed,
+							)}`;
+							logs.push(msg);
+							totalSkipped++;
+							skipped.push({ key, reason: "not an object" });
+							continue;
+						}
+						let updated = false;
+						const updatedFields: string[] = [];
+						const r2Paths: string[] = [];
+						if (!parsed.signaturePaths) parsed.signaturePaths = {};
 						for (const field of [
 							"signatureParticipant",
 							"signatureParent",
-						]) {
-							const oldPath = parsedObj?.signaturePaths?.[field];
+						] as const) {
+							const base64 = (
+								parsed as Record<typeof field, unknown>
+							)[field];
 							if (
-								typeof oldPath === "string" &&
-								oldPath.startsWith(oldKey)
+								typeof base64 === "string" &&
+								base64.startsWith("data:image/png;base64,")
 							) {
-								const ext = oldPath.endsWith(".png")
-									? ".png"
-									: "";
-								const newPath = `${newKey}${
+								const base64Data = base64.replace(
+									/^data:image\/png;base64,/,
+									"",
+								);
+								const binary = Uint8Array.from(
+									atob(base64Data),
+									c => c.charCodeAt(0),
+								);
+								const r2Path = `${key}_${
 									field === "signatureParticipant"
-										? "_participant"
-										: "_parent"
-								}${ext}`;
-								try {
-									const obj = await env.R2.get(oldPath);
-									if (obj) {
-										if (mode === "commit") {
-											await env.R2.put(
-												newPath,
-												await obj.arrayBuffer(),
-											);
-											logs.push(
-												`Copied R2 object: ${oldPath} -> ${newPath}`,
-											);
-										}
-										copiedR2.push(
-											`${oldPath} -> ${newPath}`,
-										);
-										updatedSignaturePaths[field] = newPath;
-									} else {
-										copiedR2.push(`${oldPath} (not found)`);
+										? "participant"
+										: "parent"
+								}.png`;
+								if (mode === "commit") {
+									try {
+										await env.R2.put(r2Path, binary);
 										logs.push(
-											`R2 object not found: ${oldPath}`,
+											`Uploaded ${field} for ${key} to R2: ${r2Path}`,
 										);
-									}
-								} catch (err) {
-									copiedR2.push(`${oldPath} (copy error)`);
-									logs.push(
-										`Failed to copy R2 object: ${oldPath} (${
+									} catch (err) {
+										const msg = `Failed to upload ${field} for ${key} to R2: ${
 											err instanceof Error
 												? err.message
 												: String(err)
-										})`,
+										}`;
+										logs.push(msg);
+										skipped.push({
+											key,
+											reason: `failed to upload ${field} to R2: ${msg}`,
+										});
+										totalSkipped++;
+										continue;
+									}
+								} else {
+									logs.push(
+										`[dry-run] Would upload ${field} for ${key} to R2: ${r2Path}`,
 									);
 								}
+								parsed.signaturePaths[field] = r2Path;
+								delete parsed[field];
+								updated = true;
+								updatedFields.push(field);
+								r2Paths.push(r2Path);
 							}
 						}
-						if (mode === "commit") {
-							try {
-								const newValue = JSON.stringify({
-									...parsedObj,
-									signaturePaths: updatedSignaturePaths,
-								});
-								await env._101WEEK_CONTRACTS_KV.put(
-									newKey,
-									newValue,
-								);
-								await env._101WEEK_CONTRACTS_KV.put(
-									emailIndexKey,
-									newKey,
-								);
-								logs.push(
-									`Wrote new KV: ${newKey} and email index: ${emailIndexKey}`,
-								);
-							} catch (err) {
-								skipped.push({
-									oldKey,
-									reason:
-										"failed to write new KV: " +
-										(err instanceof Error
-											? err.message
-											: String(err)),
-								});
-								logs.push(
-									`Failed to write new KV for ${oldKey}: ${
+						if (updated) {
+							if (mode === "commit") {
+								try {
+									await env._101WEEK_CONTRACTS_KV.put(
+										key,
+										JSON.stringify(parsed),
+									);
+									logs.push(`Updated KV for ${key}`);
+								} catch (err) {
+									const msg = `Failed to update KV for ${key}: ${
 										err instanceof Error
 											? err.message
 											: String(err)
-									}`,
+									}`;
+									logs.push(msg);
+									skipped.push({
+										key,
+										reason: `failed to update KV: ${msg}`,
+									});
+									totalSkipped++;
+									continue;
+								}
+							} else {
+								logs.push(
+									`[dry-run] Would update KV for ${key}`,
 								);
-								continue;
 							}
+							totalMigrated++;
+							migrated.push({ key, updatedFields, r2Paths });
+						} else {
+							totalSkipped++;
+							skipped.push({
+								key,
+								reason: "no base64 images found",
+							});
 						}
-						migrated.push({
-							oldKey,
-							newKey,
-							emailIndexKey,
-							copiedR2,
-							updatedSignaturePaths,
-						});
 					}
 					if (!listResp.list_complete) {
 						cursor = listResp.cursor;
@@ -598,31 +509,27 @@ export default {
 						break;
 					}
 				}
-				const skipReasons: Record<string, number> = {};
-				for (const s of skipped) {
-					skipReasons[s.reason] = (skipReasons[s.reason] || 0) + 1;
-				}
 				logs.push(
-					`Migration complete. Mode: ${mode}, Total scanned: ${totalScanned}, Migrated: ${migrated.length}, Skipped: ${skipped.length}`,
+					`Migration complete. Mode: ${mode}, Total scanned: ${totalScanned}, Migrated: ${totalMigrated}, Skipped: ${totalSkipped}`,
 				);
 				return new Response(
 					JSON.stringify({
 						mode,
 						totalScanned,
+						totalMigrated,
+						totalSkipped,
 						migrated,
 						skipped,
-						totalMigrated: migrated.length,
-						totalSkipped: skipped.length,
-						skipReasons,
 						logs,
 					}),
 					{ headers: { "Content-Type": "application/json" } },
 				);
 			} catch (err) {
-				console.error("/migrate-keys error", err);
+				console.error("/migrate-base64-to-r2 error", err);
 				return new Response("Migration failed", { status: 500 });
 			}
 		}
+
 		return new Response("Method Not Allowed", { status: 405 });
 	},
 } satisfies ExportedHandler<Env>;
