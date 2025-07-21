@@ -243,9 +243,6 @@ export default {
 		if (url.pathname === "/check-exists" && request.method === "GET") {
 			return await handleCheckExists(request, env);
 		}
-		if (url.pathname === "/" && request.method === "GET") {
-			return new Response("OK", { status: 200 });
-		}
 		return new Response("Method Not Allowed", { status: 405 });
 	},
 } satisfies ExportedHandler<Env>;

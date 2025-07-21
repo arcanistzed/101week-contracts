@@ -3,6 +3,9 @@
 	"name": "101week-contracts",
 	"compatibility_date": "2025-07-19",
 	"main": "worker/index.ts",
+	"assets": {
+		"not_found_handling": "single-page-application"
+	},
 	"observability": {
 		"enabled": true
 	},
