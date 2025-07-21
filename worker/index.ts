@@ -62,7 +62,7 @@ const fetchValidRecords = async (
 	return results.filter((r): r is LookupResult => r !== null);
 };
 
-const handleFormPost = async (request: Request, env: Env) => {
+export const handleFormPost = async (request: Request, env: Env) => {
 	try {
 		const submission = (await request.json()) as Submission;
 

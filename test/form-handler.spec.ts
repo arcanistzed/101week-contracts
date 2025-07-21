@@ -1,6 +1,6 @@
-import { describe, expect, it } from 'vitest';
-import type { Env } from '../functions/form-handler';
-import { onRequestPost } from "../functions/form-handler";
+import { describe, expect, it } from "vitest";
+import { Env } from "../worker/index";
+import { handleFormPost } from "../worker/index";
 
 function makeMockEnv(): Env {
 	return {
@@ -18,14 +18,16 @@ function makeMockEnv(): Env {
 }
 
 async function runFunction(request: Request, env: Env) {
-	return await onRequestPost({ request, env });
+	return await handleFormPost(request, env);
 }
 
-describe('Form submission worker', () => {
-	const validBase64 = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wIAAgMBApUAAAAASUVORK5CYII='; // short, valid png
-	const bigBase64 = 'A'.repeat(1024 * 1024 * 2); // 2MB
+describe("Form submission worker", () => {
+	const validBase64 =
+		"iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wIAAgMBApUAAAAASUVORK5CYII="; // short, valid png
+	const bigBase64 = "A".repeat(1024 * 1024 * 2); // 2MB
 
 	type Submission = {
+		preferredLanguage: string;
 		firstName: string;
 		lastName: string;
 		email: string;
@@ -36,22 +38,25 @@ describe('Form submission worker', () => {
 		emergencyName: string;
 		emergencyPhone: string;
 		signatureParticipant?: string;
+		fullNameParticipant?: string;
 		dob: string;
 		fullNameParent?: string;
 		signatureParent?: string;
 	};
 	const validSubmission: Submission = {
-		firstName: 'John',
-		lastName: 'Doe',
-		email: 'john@example.com',
-		phone: '1234567890',
-		languages: 'English',
-		program: 'Engineering',
-		rsg1: 'Yes',
-		emergencyName: 'Jane',
-		emergencyPhone: '0987654321',
+		preferredLanguage: "en",
+		firstName: "John",
+		lastName: "Doe",
+		email: "john@example.com",
+		phone: "1234567890",
+		languages: "English",
+		program: "Engineering",
+		rsg1: "Yes",
+		emergencyName: "Jane",
+		emergencyPhone: "0987654321",
 		signatureParticipant: `data:image/png;base64,${validBase64}`,
-		dob: '2000-01-01',
+		fullNameParticipant: "John Doe",
+		dob: "2000-01-01",
 	};
 
 	it("rejects missing required fields", async () => {
@@ -68,7 +73,11 @@ describe('Form submission worker', () => {
 		}
 		expect(res.status).toBe(400);
 		const text = await res.text();
-		expect(text).toMatch(/Missing required field: signatureParticipant/);
+		expect(
+			/Missing required field: (signatureParticipant|fullNameParticipant)/.test(
+				text,
+			),
+		).toBe(true);
 	});
 
 	it("rejects invalid email", async () => {
@@ -122,6 +131,7 @@ describe('Form submission worker', () => {
 	it("rejects oversized participant signature", async () => {
 		const big = {
 			...validSubmission,
+			fullNameParticipant: "John Doe",
 			signatureParticipant: `data:image/png;base64,${bigBase64}`,
 		};
 		const req = new Request("http://test", {
