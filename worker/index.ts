@@ -50,7 +50,6 @@ const handleFormPost = async (request: Request, env: Env) => {
 			"rsg1",
 			"emergencyName",
 			"emergencyPhone",
-			"signatureParticipant",
 		];
 		for (const field of requiredFields) {
 			if (
@@ -79,7 +78,6 @@ const handleFormPost = async (request: Request, env: Env) => {
 				});
 			}
 		}
-		// If under 18, require parent fields
 		let isAdult = true;
 		if (submission.dob && typeof submission.dob === "string") {
 			const birthDate = new Date(submission.dob);
@@ -91,7 +89,23 @@ const handleFormPost = async (request: Request, env: Env) => {
 			}
 			isAdult = age >= 18;
 		}
-		if (!isAdult) {
+		if (isAdult) {
+			const participantFields: (keyof Submission)[] = [
+				"fullNameParticipant",
+				"signatureParticipant",
+			];
+			for (const field of participantFields) {
+				if (
+					!submission[field] ||
+					(typeof submission[field] === "string" &&
+						submission[field].toString().trim() === "")
+				) {
+					return new Response(`Missing required field: ${field}`, {
+						status: 400,
+					});
+				}
+			}
+		} else {
 			const parentFields: (keyof Submission)[] = [
 				"fullNameParent",
 				"signatureParent",

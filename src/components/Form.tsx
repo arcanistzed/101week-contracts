@@ -81,21 +81,26 @@ function Form({ submitted, setSubmitted }: FormProps) {
 			newErrors.emergencyName = t("form.error.required");
 		if (!formData.emergencyPhone.trim())
 			newErrors.emergencyPhone = t("form.error.required");
-		if (
-			!formData.signatureParticipant ||
-			formData.signatureParticipant === ""
-		)
-			newErrors.signatureParticipant = t("form.error.required");
-		if (
-			formData.signatureParticipant &&
-			typeof formData.signatureParticipant === "string" &&
-			formData.signatureParticipant.startsWith("data:image/")
-		) {
-			const base64 = formData.signatureParticipant.split(",")[1] || "";
-			if ((base64.length * 3) / 4 > MAX_SIGNATURE_SIZE) {
-				newErrors.signatureParticipant = t("signature.errorSize", {
-					size: "1MB",
-				});
+		if (isAdult) {
+			if (!formData.fullNameParticipant.trim())
+				newErrors.fullNameParticipant = t("form.error.required");
+			if (
+				!formData.signatureParticipant ||
+				formData.signatureParticipant === ""
+			)
+				newErrors.signatureParticipant = t("form.error.required");
+			if (
+				formData.signatureParticipant &&
+				typeof formData.signatureParticipant === "string" &&
+				formData.signatureParticipant.startsWith("data:image/")
+			) {
+				const base64 =
+					formData.signatureParticipant.split(",")[1] || "";
+				if ((base64.length * 3) / 4 > MAX_SIGNATURE_SIZE) {
+					newErrors.signatureParticipant = t("signature.errorSize", {
+						size: "1MB",
+					});
+				}
 			}
 		}
 		if (formData.dob && formData.dob > todayStr)
@@ -503,13 +508,26 @@ function Form({ submitted, setSubmitted }: FormProps) {
 							name="fullNameParticipant"
 							value={formData.fullNameParticipant}
 							onChange={handleChange}
+							required={isAdult}
+							aria-required={isAdult ? "true" : undefined}
+							aria-invalid={!!errors.fullNameParticipant}
+							aria-describedby={getErrorId("fullNameParticipant")}
 						/>
+						{errors.fullNameParticipant && (
+							<div
+								className="form-error"
+								role="alert"
+								id="fullNameParticipant-error"
+							>
+								{errors.fullNameParticipant}
+							</div>
+						)}
 						<SignatureField
 							label={t("form.participant.signature")}
 							name="signatureParticipant"
 							value={formData.signatureParticipant}
 							onChange={handleChange}
-							aria-required="true"
+							aria-required={isAdult ? "true" : undefined}
 							aria-invalid={!!errors.signatureParticipant}
 							aria-describedby={getErrorId(
 								"signatureParticipant",
@@ -550,8 +568,8 @@ function Form({ submitted, setSubmitted }: FormProps) {
 								name="fullNameParent"
 								value={formData.fullNameParent}
 								onChange={handleChange}
-								required
-								aria-required="true"
+								required={!isAdult}
+								aria-required={!isAdult ? "true" : undefined}
 								aria-invalid={!!errors.fullNameParent}
 								aria-describedby={getErrorId("fullNameParent")}
 							/>
@@ -569,7 +587,7 @@ function Form({ submitted, setSubmitted }: FormProps) {
 								name="signatureParent"
 								value={formData.signatureParent}
 								onChange={handleChange}
-								aria-required="true"
+								aria-required={!isAdult ? "true" : undefined}
 								aria-invalid={!!errors.signatureParent}
 								aria-describedby={getErrorId("signatureParent")}
 							/>
