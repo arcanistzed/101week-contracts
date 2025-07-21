@@ -3,30 +3,7 @@ export interface Env {
 	R2: R2Bucket;
 }
 
-interface Submission {
-	preferredLanguage: string;
-	firstName: string;
-	lastName: string;
-	email: string;
-	phone: string;
-	languages: string;
-	program: string;
-	rsg1: string;
-	rsg2?: string;
-	emergencyName: string;
-	emergencyPhone: string;
-	emergencyRelationship?: string;
-	dob?: string;
-	pronouns?: string;
-	medical?: string;
-	accessibility?: string;
-	fullNameParticipant?: string;
-	signatureParticipant?: string;
-	dateParticipant?: string;
-	fullNameParent?: string;
-	signatureParent?: string;
-	dateParent?: string;
-}
+import type { Submission, LookupResult } from "../src/types";
 
 const sanitize = (str: string) =>
 	str
@@ -212,67 +189,84 @@ const handleFormPost = async (request: Request, env: Env) => {
 	}
 };
 
-const handleCheckExists = async (request: Request, env: Env) => {
-	const url = new URL(request.url);
-	const input = url.searchParams.get("input");
-	if (!input) {
-		return new Response("Missing 'input' query parameter", {
-			status: 400,
-		});
-	}
-	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-	let normalized: string;
-	let inputType: string;
-	let listResponse;
-	let matchingKeys;
-	if (emailRegex.test(input)) {
-		normalized = input
-			.toLowerCase()
-			.replace(/[^a-z0-9]/g, "_")
-			.replace(/_+/g, "_")
-			.replace(/^_+|_+$/g, "");
-		inputType = "email";
-		listResponse = await env._101WEEK_CONTRACTS_KV.list({
-			prefix: `_${normalized}_`,
-		});
-		matchingKeys = listResponse.keys;
-	} else {
-		const parts = input.trim().split(/\s+/);
-		if (parts.length !== 2) {
-			return new Response("Input must be a valid email or full name", {
+
+
+const MAX_RESULTS = 50;
+
+const handleLookup = async (request: Request, env: Env) => {
+	try {
+		const url = new URL(request.url);
+		const input = url.searchParams.get("input");
+		if (!input) {
+			return new Response("Missing 'input' query parameter", {
 				status: 400,
 			});
 		}
-		const firstName = parts[0]
-			.toLowerCase()
-			.replace(/[^a-z0-9]/g, "_")
-			.replace(/_+/g, "_")
-			.replace(/^_+|_+$/g, "");
-		const lastName = parts[1]
-			.toLowerCase()
-			.replace(/[^a-z0-9]/g, "_")
-			.replace(/_+/g, "_")
-			.replace(/^_+|_+$/g, "");
-		normalized = `${firstName}_${lastName}_`;
-		inputType = "fullName";
-		listResponse = await env._101WEEK_CONTRACTS_KV.list({
-			prefix: normalized,
-		});
-		matchingKeys = listResponse.keys;
-	}
-	const exists = matchingKeys.length > 0;
-	return new Response(
-		JSON.stringify({
-			inputType,
-			input,
-			normalized,
-			matchingKeys: matchingKeys.map(key => key.name),
-			exists,
-		}),
-		{
+		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+		let listResponse;
+		if (emailRegex.test(input)) {
+			const normalized = input
+				.toLowerCase()
+				.replace(/[^a-z0-9]/g, "_")
+				.replace(/_+/g, "_")
+				.replace(/^_+|_+$/g, "");
+			listResponse = await env._101WEEK_CONTRACTS_KV.list({
+				prefix: `_${normalized}_`,
+			});
+		} else {
+			const parts = input.trim().split(/\s+/);
+			if (parts.length !== 2) {
+				return new Response(
+					"Input must be a valid email or full name",
+					{
+						status: 400,
+					},
+				);
+			}
+			const firstName = parts[0]
+				.toLowerCase()
+				.replace(/[^a-z0-9]/g, "_")
+				.replace(/_+/g, "_")
+				.replace(/^_+|_+$/g, "");
+			const lastName = parts[1]
+				.toLowerCase()
+				.replace(/[^a-z0-9]/g, "_")
+				.replace(/_+/g, "_")
+				.replace(/^_+|_+$/g, "");
+			const normalized = `${firstName}_${lastName}_`;
+			listResponse = await env._101WEEK_CONTRACTS_KV.list({
+				prefix: normalized,
+			});
+		}
+
+		const results: LookupResult[] = (
+			await Promise.all(
+				listResponse.keys.slice(0, MAX_RESULTS).map(async keyObj => {
+					const value = await env._101WEEK_CONTRACTS_KV.get(
+						keyObj.name,
+					);
+					if (value) {
+						try {
+							return {
+								key: keyObj.name,
+								data: JSON.parse(value),
+							};
+						} catch {
+							return { key: keyObj.name, data: value };
+						}
+					}
+					return null;
+				}),
+			)
+		).filter(Boolean) as LookupResult[];
+
+		return new Response(JSON.stringify(results), {
 			headers: { "Content-Type": "application/json" },
-		},
-	);
+		});
+	} catch (err) {
+		console.error("/lookup error", err);
+		return new Response("Internal Server Error", { status: 500 });
+	}
 };
 
 export default {
@@ -282,8 +276,8 @@ export default {
 		if (url.pathname === "/form-handler" && request.method === "POST") {
 			return await handleFormPost(request, env);
 		}
-		if (url.pathname === "/check-exists" && request.method === "GET") {
-			return await handleCheckExists(request, env);
+		if (url.pathname === "/lookup" && request.method === "GET") {
+			return await handleLookup(request, env);
 		}
 		return new Response("Method Not Allowed", { status: 405 });
 	},
