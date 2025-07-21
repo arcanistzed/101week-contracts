@@ -359,6 +359,62 @@ const handleLookup = async (request: Request, env: Env) => {
 	}
 };
 
+const handleDelete = async (request: Request, env: Env) => {
+	if (request.method !== "POST") {
+		return new Response("Method Not Allowed", { status: 405 });
+	}
+	try {
+		const body = await request.json();
+		let key: string | undefined;
+		if (
+			body &&
+			typeof body === "object" &&
+			body !== null &&
+			"key" in body
+		) {
+			const k = (body as Record<string, unknown>).key;
+			if (typeof k === "string") key = k;
+		}
+		if (!key) {
+			return new Response("Missing or invalid 'key' in request body", {
+				status: 400,
+			});
+		}
+		// Delete the main record
+		await env._101WEEK_CONTRACTS_KV.delete(key);
+
+		// Attempt to delete any email index key(s) that point to this record
+		// List all keys with prefix 'email_' and check if their value matches the deleted key
+		const listResp = await env._101WEEK_CONTRACTS_KV.list({
+			prefix: "email_",
+		});
+		for (const k of listResp.keys) {
+			const val = await env._101WEEK_CONTRACTS_KV.get(k.name);
+			if (val === key) {
+				await env._101WEEK_CONTRACTS_KV.delete(k.name);
+			}
+		}
+
+		// Optionally, also delete signatures from R2 if present
+		// Try both possible signature paths
+		const participantPath = key + "_participant.png";
+		const parentPath = key + "_parent.png";
+		const participantJpeg = key + "_participant.jpeg";
+		const parentJpeg = key + "_parent.jpeg";
+		await env.R2.delete(participantPath).catch(() => {});
+		await env.R2.delete(parentPath).catch(() => {});
+		await env.R2.delete(participantJpeg).catch(() => {});
+		await env.R2.delete(parentJpeg).catch(() => {});
+
+		return new Response(JSON.stringify({ ok: true }), {
+			headers: { "Content-Type": "application/json" },
+		});
+	} catch (err) {
+		const message = err instanceof Error ? err.message : String(err);
+		return new Response("Bad Request: " + message, { status: 400 });
+	}
+};
+
 export default {
 	async fetch(request: Request, env: Env) {
 		const url = new URL(request.url);
@@ -368,6 +424,9 @@ export default {
 		}
 		if (url.pathname === "/lookup" && request.method === "GET") {
 			return await handleLookup(request, env);
+		}
+		if (url.pathname === "/delete" && request.method === "POST") {
+			return await handleDelete(request, env);
 		}
 
 		return new Response("Method Not Allowed", { status: 405 });
