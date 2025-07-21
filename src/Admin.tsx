@@ -38,59 +38,40 @@ function ErrorMessage({ error }: { error: string }) {
 	);
 }
 
-function ResultTable({
-	data,
-	onDelete,
-}: {
-	data: Record<string, unknown>;
-	onDelete?: () => void;
-}) {
+function ResultTable({ data }: { data: Record<string, unknown> }) {
 	return (
-		<>
-			<table>
-				<tbody>
-					{Object.entries(data)
-						.filter(([k, v]) => {
-							return (
-								k in fieldLabels &&
-								(typeof v === "string" ||
-									typeof v === "number" ||
-									typeof v === "boolean") &&
-								v
-							);
-						})
-						.map(([k, v]) => (
-							<tr key={k}>
-								<td>
-									{fieldLabels[k as keyof typeof fieldLabels]}
-								</td>
-								<td>
-									{typeof v === "string" ||
-									typeof v === "number" ||
-									typeof v === "boolean"
-										? v.toString()
-										: ""}
-								</td>
-							</tr>
-						))}
-				</tbody>
-			</table>
-			{onDelete && (
-				<button type="button" onClick={onDelete}>
-					Delete
-				</button>
-			)}
-		</>
+		<table>
+			<tbody>
+				{Object.entries(data)
+					.filter(([k, v]) => {
+						return (
+							k in fieldLabels &&
+							(typeof v === "string" ||
+								typeof v === "number" ||
+								typeof v === "boolean") &&
+							v
+						);
+					})
+					.map(([k, v]) => (
+						<tr key={k}>
+							<td>
+								{fieldLabels[k as keyof typeof fieldLabels]}
+							</td>
+							<td>
+								{typeof v === "string" ||
+								typeof v === "number" ||
+								typeof v === "boolean"
+									? v.toString()
+									: ""}
+							</td>
+						</tr>
+					))}
+			</tbody>
+		</table>
 	);
 }
 
-function AdminResults({
-	results,
-	onDelete,
-}: {
-	results: LookupResult[];
-	onDelete: (key: string) => void;
-}) {
+function AdminResults({ results }: { results: LookupResult[] }) {
 	if (results.length === 0) {
 		return <span>No entry found.</span>;
 	}
@@ -98,7 +79,6 @@ function AdminResults({
 		return (
 			<ResultTable
 				data={results[0].data as unknown as Record<string, unknown>}
-				onDelete={() => onDelete(results[0].key)}
 			/>
 		);
 	}
@@ -109,7 +89,6 @@ function AdminResults({
 				<ResultTable
 					key={key}
 					data={data as unknown as Record<string, unknown>}
-					onDelete={() => onDelete(key)}
 				/>
 			))}
 		</>
@@ -167,39 +146,6 @@ function Admin() {
 		}
 	};
 
-	const handleDelete = async (key: string) => {
-		if (
-			!window.confirm(
-				"Are you sure you want to delete this entry? This cannot be undone.",
-			)
-		)
-			return;
-		setLoading(true);
-		setError(null);
-		try {
-			const resp = await fetch("/delete", {
-				method: "POST",
-				headers: { "Content-Type": "application/json" },
-				body: JSON.stringify({ key }),
-			});
-			if (!resp.ok) {
-				const msg = await resp.text();
-				setError(msg || "Failed to delete entry.");
-			} else {
-				// Remove the deleted entry from results
-				setResults(results =>
-					results ? results.filter(r => r.key !== key) : null,
-				);
-			}
-		} catch {
-			setError(
-				"A network or unexpected error occurred while deleting. Please try again.",
-			);
-		} finally {
-			setLoading(false);
-		}
-	};
-
 	return (
 		<main className="admin-container">
 			<form onSubmit={handleCheck} className="admin-form">
@@ -232,10 +178,7 @@ function Admin() {
 					<div aria-live="polite" className="admin-results">
 						{loading && <LoadingSpinner />}
 						{results && !loading && (
-							<AdminResults
-								results={results}
-								onDelete={handleDelete}
-							/>
+							<AdminResults results={results} />
 						)}
 						{error && <ErrorMessage error={error} />}
 					</div>
