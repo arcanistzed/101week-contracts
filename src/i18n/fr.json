@@ -79,6 +79,7 @@
 		"canvasAria": "Zone de dessin de la signature",
 		"preview": "Aperçu de la signature",
 		"errorType": "Veuillez téléverser un fichier image valide.",
+		"errorTypeAllowed": "Seuls les fichiers PNG et JPEG sont autorisés.",
 		"errorSize": "L’image doit être inférieure à {{size}}.",
 		"errorLength": "La signature doit comporter {{max}} caractères ou moins."
 	},

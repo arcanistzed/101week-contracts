@@ -79,6 +79,7 @@
 		"canvasAria": "Signature drawing area",
 		"preview": "Signature preview",
 		"errorType": "Please upload a valid image file.",
+		"errorTypeAllowed": "Only PNG and JPEG images are allowed.",
 		"errorSize": "Image must be less than {{size}}.",
 		"errorLength": "Signature must be {{max}} characters or fewer."
 	},

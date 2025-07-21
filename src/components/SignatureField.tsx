@@ -2,6 +2,8 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import SignaturePad from "signature_pad";
 
+const ALLOWED_IMAGE_TYPES = ["image/png", "image/jpeg"];
+
 interface SignatureFieldProps {
 	label: string;
 	name: string;
@@ -84,162 +86,137 @@ function SignatureField({ label, name, onChange, value }: SignatureFieldProps) {
 		}
 	}, [name, onChange]);
 
-	const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-		setError("");
-		const file = e.target.files?.[0];
-		if (file) {
-			if (!file.type.startsWith("image/")) {
-				setError(t("signature.errorType"));
-				return;
-			}
-			if (file.size > MAX_IMAGE_SIZE) {
-				setError(t("signature.errorSize", { size: "1MB" }));
-				return;
-			}
-			const reader = new FileReader();
-			reader.onload = ev => {
-				const imgData = ev.target?.result as string;
-				setUploadedImage(imgData);
-				const event = {
-					target: { name, value: imgData },
-				} as React.ChangeEvent<HTMLInputElement>;
-				onChange(event);
-			};
-			reader.readAsDataURL(file);
-		}
-	};
-
-	const handleTypedSignature = (e: React.ChangeEvent<HTMLInputElement>) => {
-		setError("");
-		const val = e.target.value;
-		if (val.length > MAX_SIGNATURE_LENGTH) {
-			setError(t("signature.errorLength", { max: MAX_SIGNATURE_LENGTH }));
+const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+	setError("");
+	const file = e.target.files?.[0];
+	if (file) {
+		if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+			setError(t("signature.errorTypeAllowed", { types: "PNG, JPEG" }));
 			return;
 		}
-		setTypedSignature(val);
-		const event = {
-			target: { name, value: val },
-		} as React.ChangeEvent<HTMLInputElement>;
-		onChange(event);
-	};
+		if (file.size > MAX_IMAGE_SIZE) {
+			setError(t("signature.errorSize", { size: "1MB" }));
+			return;
+		}
+		const reader = new FileReader();
+		reader.onload = ev => {
+			const imgData = ev.target?.result as string;
+			setUploadedImage(imgData);
+			const event = {
+				target: { name, value: imgData },
+			} as React.ChangeEvent<HTMLInputElement>;
+			onChange(event);
+		};
+		reader.readAsDataURL(file);
+	}
+};
 
-	useEffect(() => {
+const handleTypedSignature = (e: React.ChangeEvent<HTMLInputElement>) => {
+	setError("");
+	const val = e.target.value;
+	if (val.length > MAX_SIGNATURE_LENGTH) {
+		setError(t("signature.errorLength", { max: MAX_SIGNATURE_LENGTH }));
+		return;
+	}
+	setTypedSignature(val);
+	const event = {
+		target: { name, value: val },
+	} as React.ChangeEvent<HTMLInputElement>;
+	onChange(event);
+};
+
+useEffect(() => {
+	if (canvasRef.current) {
+		padRef.current = new SignaturePad(canvasRef.current);
+		padRef.current.addEventListener("endStroke", handleEnd);
+		if (value) {
+			padRef.current.fromDataURL(value);
+		}
+	}
+	return () => {
+		if (padRef.current) {
+			padRef.current.off();
+			padRef.current.removeEventListener("endStroke", handleEnd);
+		}
+		padRef.current = null;
+	};
+}, [handleEnd, value]);
+
+useEffect(() => {
+	if (padRef.current && value) {
+		padRef.current.fromDataURL(value);
+	}
+}, [value]);
+
+const prevMode = useRef<"draw" | "upload" | "type">(mode);
+useEffect(() => {
+	if (prevMode.current === "upload" && mode !== "upload") {
+		setUploadedImage("");
+	}
+	if (mode === "draw") {
 		if (canvasRef.current) {
+			if (padRef.current) {
+				padRef.current.off();
+			}
 			padRef.current = new SignaturePad(canvasRef.current);
 			padRef.current.addEventListener("endStroke", handleEnd);
+			resizeCanvas();
 			if (value) {
 				padRef.current.fromDataURL(value);
 			}
 		}
-		return () => {
-			if (padRef.current) {
-				padRef.current.off();
-				padRef.current.removeEventListener("endStroke", handleEnd);
-			}
-			padRef.current = null;
-		};
-	}, [handleEnd, value]);
+	}
+	prevMode.current = mode;
+}, [mode, handleEnd, resizeCanvas, value]);
 
-	useEffect(() => {
-		if (padRef.current && value) {
-			padRef.current.fromDataURL(value);
-		}
-	}, [value]);
-
-	const prevMode = useRef<"draw" | "upload" | "type">(mode);
-	useEffect(() => {
-		if (prevMode.current === "upload" && mode !== "upload") {
-			setUploadedImage("");
-		}
-		if (mode === "draw") {
-			if (canvasRef.current) {
-				if (padRef.current) {
-					padRef.current.off();
-				}
-				padRef.current = new SignaturePad(canvasRef.current);
-				padRef.current.addEventListener("endStroke", handleEnd);
-				resizeCanvas();
-				if (value) {
-					padRef.current.fromDataURL(value);
-				}
-			}
-		}
-		prevMode.current = mode;
-	}, [mode, handleEnd, resizeCanvas, value]);
-
-	return (
-		<div className="form-group">
-			<span>{label}</span>
-			<div className="signature-container">
-				{error && (
-					<div aria-live="polite" className="signature-error">
-						{error}
-					</div>
-				)}
-				{mode === "draw" && (
-					<>
-						<canvas
-							ref={canvasRef}
-							className="signature-canvas"
-							aria-label={t("signature.canvasAria")}
-						/>
-						<button
-							type="button"
-							onClick={clearSignature}
-							className="signature-clear-button"
-							title={t("signature.clear")}
-						>
-							&#x2715;
-						</button>
-						<input
-							ref={inputRef}
-							type="hidden"
-							name={name}
-							value={value}
-							readOnly
-						/>
-					</>
-				)}
-				{mode === "upload" && (
-					<div className="signature-upload-group">
-						<input
-							type="file"
-							accept="image/*"
-							onChange={handleImageUpload}
-							className="signature-input"
-						/>
-						{uploadedImage && (
-							<>
-								<img
-									src={uploadedImage}
-									alt={t("signature.preview")}
-									className="signature-upload-preview"
-								/>
-								<button
-									type="button"
-									onClick={clearSignature}
-									className="signature-clear-button"
-									title={t("signature.clear")}
-								>
-									&#x2715;
-								</button>
-							</>
-						)}
-					</div>
-				)}
-				{mode === "type" && (
-					<>
-						<input
-							type="text"
-							placeholder={t("signature.typePlaceholder")}
-							value={typedSignature}
-							onChange={handleTypedSignature}
-							name={name}
-							id={name}
-							maxLength={MAX_SIGNATURE_LENGTH}
-							className="signature-type-input"
-						/>
-						{!!typedSignature && (
+return (
+	<div className="form-group">
+		<span>{label}</span>
+		<div className="signature-container">
+			{error && (
+				<div aria-live="polite" className="signature-error">
+					{error}
+				</div>
+			)}
+			{mode === "draw" && (
+				<>
+					<canvas
+						ref={canvasRef}
+						className="signature-canvas"
+						aria-label={t("signature.canvasAria")}
+					/>
+					<button
+						type="button"
+						onClick={clearSignature}
+						className="signature-clear-button"
+						title={t("signature.clear")}
+					>
+						&#x2715;
+					</button>
+					<input
+						ref={inputRef}
+						type="hidden"
+						name={name}
+						value={value}
+						readOnly
+					/>
+				</>
+			)}
+			{mode === "upload" && (
+				<div className="signature-upload-group">
+					<input
+						type="file"
+						accept="image/png,image/jpeg"
+						onChange={handleImageUpload}
+						className="signature-input"
+					/>
+					{uploadedImage && (
+						<>
+							<img
+								src={uploadedImage}
+								alt={t("signature.preview")}
+								className="signature-upload-preview"
+							/>
 							<button
 								type="button"
 								onClick={clearSignature}
@@ -248,50 +225,75 @@ function SignatureField({ label, name, onChange, value }: SignatureFieldProps) {
 							>
 								&#x2715;
 							</button>
-						)}
-					</>
-				)}
-			</div>
-			<div className="signature-mode-group">
-				<label
-					htmlFor={`${name}-mode-draw`}
-					className="signature-mode-label"
-				>
+						</>
+					)}
+				</div>
+			)}
+			{mode === "type" && (
+				<>
 					<input
-						type="radio"
-						id={`${name}-mode-draw`}
-						checked={mode === "draw"}
-						onChange={() => setMode("draw")}
+						type="text"
+						placeholder={t("signature.typePlaceholder")}
+						value={typedSignature}
+						onChange={handleTypedSignature}
+						name={name}
+						id={name}
+						maxLength={MAX_SIGNATURE_LENGTH}
+						className="signature-type-input"
 					/>
-					{t("signature.draw")}
-				</label>
-				<label
-					htmlFor={`${name}-mode-upload`}
-					className="signature-mode-label"
-				>
-					<input
-						type="radio"
-						id={`${name}-mode-upload`}
-						checked={mode === "upload"}
-						onChange={() => setMode("upload")}
-					/>
-					{t("signature.upload")}
-				</label>
-				<label
-					htmlFor={`${name}-mode-type`}
-					className="signature-mode-label"
-				>
-					<input
-						type="radio"
-						id={`${name}-mode-type`}
-						checked={mode === "type"}
-						onChange={() => setMode("type")}
-					/>
-					{t("signature.type")}
-				</label>
-			</div>
+					{!!typedSignature && (
+						<button
+							type="button"
+							onClick={clearSignature}
+							className="signature-clear-button"
+							title={t("signature.clear")}
+						>
+							&#x2715;
+						</button>
+					)}
+				</>
+			)}
 		</div>
-	);
+		<div className="signature-mode-group">
+			<label
+				htmlFor={`${name}-mode-draw`}
+				className="signature-mode-label"
+			>
+				<input
+					type="radio"
+					id={`${name}-mode-draw`}
+					checked={mode === "draw"}
+					onChange={() => setMode("draw")}
+				/>
+				{t("signature.draw")}
+			</label>
+			<label
+				htmlFor={`${name}-mode-upload`}
+				className="signature-mode-label"
+			>
+				<input
+					type="radio"
+					id={`${name}-mode-upload`}
+					checked={mode === "upload"}
+					onChange={() => setMode("upload")}
+				/>
+				{t("signature.upload")}
+			</label>
+			<label
+				htmlFor={`${name}-mode-type`}
+				className="signature-mode-label"
+			>
+				<input
+					type="radio"
+					id={`${name}-mode-type`}
+					checked={mode === "type"}
+					onChange={() => setMode("type")}
+				/>
+				{t("signature.type")}
+			</label>
+		</div>
+	</div>
+);
 }
 
 export default SignatureField;

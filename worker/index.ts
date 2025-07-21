@@ -5,6 +5,11 @@ export interface Env {
 
 import type { Submission, LookupResult } from "../src/types";
 
+const ALLOWED_IMAGE_PREFIXES = [
+	"data:image/png;base64,",
+	"data:image/jpeg;base64,",
+];
+
 const requiredFields: (keyof Submission)[] = [
 	"preferredLanguage",
 	"firstName",
@@ -146,12 +151,50 @@ const handleFormPost = async (request: Request, env: Env) => {
 		const originalSignatureParticipant = submission.signatureParticipant;
 		const originalSignatureParent = submission.signatureParent;
 
+		// Validate allowed image types for signatures
 		if (
 			originalSignatureParticipant &&
 			typeof originalSignatureParticipant === "string" &&
-			originalSignatureParticipant.startsWith("data:image/png;base64,")
+			originalSignatureParticipant.startsWith("data:image/")
 		) {
-			signaturePaths.signatureParticipant = `${kvKey}_participant.png`;
+			const allowed = ALLOWED_IMAGE_PREFIXES.some(prefix =>
+				originalSignatureParticipant.startsWith(prefix),
+			);
+			if (!allowed) {
+				return new Response(
+					"Participant signature must be PNG or JPEG",
+					{ status: 400 },
+				);
+			}
+		}
+		if (
+			originalSignatureParent &&
+			typeof originalSignatureParent === "string" &&
+			originalSignatureParent.startsWith("data:image/")
+		) {
+			const allowed = ALLOWED_IMAGE_PREFIXES.some(prefix =>
+				originalSignatureParent.startsWith(prefix),
+			);
+			if (!allowed) {
+				return new Response("Parent signature must be PNG or JPEG", {
+					status: 400,
+				});
+			}
+		}
+
+		if (
+			originalSignatureParticipant &&
+			typeof originalSignatureParticipant === "string" &&
+			ALLOWED_IMAGE_PREFIXES.some(prefix =>
+				originalSignatureParticipant.startsWith(prefix),
+			)
+		) {
+			const ext = originalSignatureParticipant.startsWith(
+				"data:image/png",
+			)
+				? "png"
+				: "jpeg";
+			signaturePaths.signatureParticipant = `${kvKey}_participant.${ext}`;
 			delete submission.signatureParticipant;
 		} else {
 			signaturePaths.signatureParticipant = null;
@@ -159,9 +202,14 @@ const handleFormPost = async (request: Request, env: Env) => {
 		if (
 			originalSignatureParent &&
 			typeof originalSignatureParent === "string" &&
-			originalSignatureParent.startsWith("data:image/png;base64,")
+			ALLOWED_IMAGE_PREFIXES.some(prefix =>
+				originalSignatureParent.startsWith(prefix),
+			)
 		) {
-			signaturePaths.signatureParent = `${kvKey}_parent.png`;
+			const ext = originalSignatureParent.startsWith("data:image/png")
+				? "png"
+				: "jpeg";
+			signaturePaths.signatureParent = `${kvKey}_parent.${ext}`;
 			delete submission.signatureParent;
 		} else {
 			signaturePaths.signatureParent = null;
@@ -182,37 +230,47 @@ const handleFormPost = async (request: Request, env: Env) => {
 			signaturePaths.signatureParticipant &&
 			typeof originalSignatureParticipant === "string"
 		) {
-			const base64Data = originalSignatureParticipant.replace(
-				/^data:image\/png;base64,/,
-				"",
+			const prefix = ALLOWED_IMAGE_PREFIXES.find(prefix =>
+				originalSignatureParticipant.startsWith(prefix),
 			);
-			if ((base64Data.length * 3) / 4 > MAX_IMAGE_SIZE) {
-				return new Response("Participant signature image too large", {
-					status: 400,
-				});
+			if (prefix) {
+				const base64Data = originalSignatureParticipant.replace(
+					prefix,
+					"",
+				);
+				if ((base64Data.length * 3) / 4 > MAX_IMAGE_SIZE) {
+					return new Response(
+						"Participant signature image too large",
+						{
+							status: 400,
+						},
+					);
+				}
+				const binary = Uint8Array.from(atob(base64Data), c =>
+					c.charCodeAt(0),
+				);
+				await env.R2.put(signaturePaths.signatureParticipant, binary);
 			}
-			const binary = Uint8Array.from(atob(base64Data), c =>
-				c.charCodeAt(0),
-			);
-			await env.R2.put(signaturePaths.signatureParticipant, binary);
 		}
 		if (
 			signaturePaths.signatureParent &&
 			typeof originalSignatureParent === "string"
 		) {
-			const base64Data = originalSignatureParent.replace(
-				/^data:image\/png;base64,/,
-				"",
+			const prefix = ALLOWED_IMAGE_PREFIXES.find(prefix =>
+				originalSignatureParent.startsWith(prefix),
 			);
-			if ((base64Data.length * 3) / 4 > MAX_IMAGE_SIZE) {
-				return new Response("Parent signature image too large", {
-					status: 400,
-				});
+			if (prefix) {
+				const base64Data = originalSignatureParent.replace(prefix, "");
+				if ((base64Data.length * 3) / 4 > MAX_IMAGE_SIZE) {
+					return new Response("Parent signature image too large", {
+						status: 400,
+					});
+				}
+				const binary = Uint8Array.from(atob(base64Data), c =>
+					c.charCodeAt(0),
+				);
+				await env.R2.put(signaturePaths.signatureParent, binary);
 			}
-			const binary = Uint8Array.from(atob(base64Data), c =>
-				c.charCodeAt(0),
-			);
-			await env.R2.put(signaturePaths.signatureParent, binary);
 		}
 
 		return new Response(JSON.stringify({ ok: true, id: kvKey }), {
@@ -419,12 +477,23 @@ export default {
 							)[field];
 							if (
 								typeof base64 === "string" &&
-								base64.startsWith("data:image/png;base64,")
+								(base64.startsWith("data:image/png;base64,") ||
+									base64.startsWith(
+										"data:image/jpeg;base64,",
+									))
 							) {
-								const base64Data = base64.replace(
-									/^data:image\/png;base64,/,
-									"",
-								);
+								let ext: "png" | "jpeg";
+								let prefix: string;
+								if (
+									base64.startsWith("data:image/png;base64,")
+								) {
+									ext = "png";
+									prefix = "data:image/png;base64,";
+								} else {
+									ext = "jpeg";
+									prefix = "data:image/jpeg;base64,";
+								}
+								const base64Data = base64.replace(prefix, "");
 								const binary = Uint8Array.from(
 									atob(base64Data),
 									c => c.charCodeAt(0),
@@ -433,7 +502,7 @@ export default {
 									field === "signatureParticipant"
 										? "participant"
 										: "parent"
-								}.png`;
+								}.${ext}`;
 								if (mode === "commit") {
 									try {
 										await env.R2.put(r2Path, binary);

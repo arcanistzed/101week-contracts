@@ -13,14 +13,18 @@ import SignatureField from "./SignatureField";
 import TextArea from "./TextArea";
 import TextInput from "./TextInput";
 
+const LOCAL_STORAGE_KEY = "101week-contracts.form.v1";
+const MAX_SIGNATURE_SIZE = 1024 * 1024; // 1MB
+const ALLOWED_IMAGE_PREFIXES = [
+	"data:image/png;base64,",
+	"data:image/jpeg;base64,",
+];
+
 type FormField = keyof Omit<Submission, "preferredLanguage">;
 
 type FormErrors = Partial<Record<FormField | "form", string>>;
 
 type FormProps = { submitted: boolean; setSubmitted: (v: boolean) => void };
-
-const LOCAL_STORAGE_KEY = "101week-contracts.form.v1";
-const MAX_SIGNATURE_SIZE = 1024 * 1024; // 1MB
 
 interface FormContextType {
 	formData: typeof defaultFormData;
@@ -108,18 +112,26 @@ const validateParticipant = (
 		if (
 			!formData.signatureParticipant ||
 			formData.signatureParticipant === ""
-		)
-			errors.signatureParticipant = t("form.error.required");
-		if (
-			formData.signatureParticipant &&
-			typeof formData.signatureParticipant === "string" &&
-			formData.signatureParticipant.startsWith("data:image/")
 		) {
-			const base64 = formData.signatureParticipant.split(",")[1] || "";
-			if ((base64.length * 3) / 4 > MAX_SIGNATURE_SIZE) {
-				errors.signatureParticipant = t("signature.errorSize", {
-					size: "1MB",
+			errors.signatureParticipant = t("form.error.required");
+		} else if (typeof formData.signatureParticipant === "string") {
+			const isAllowedType = ALLOWED_IMAGE_PREFIXES.some(
+				prefix =>
+					!!formData.signatureParticipant &&
+					formData.signatureParticipant.startsWith(prefix),
+			);
+			if (!isAllowedType) {
+				errors.signatureParticipant = t("signature.errorTypeAllowed", {
+					types: "PNG, JPEG",
 				});
+			} else {
+				const base64 =
+					formData.signatureParticipant.split(",")[1] || "";
+				if ((base64.length * 3) / 4 > MAX_SIGNATURE_SIZE) {
+					errors.signatureParticipant = t("signature.errorSize", {
+						size: "1MB",
+					});
+				}
 			}
 		}
 	}
@@ -136,18 +148,25 @@ const validateParent = (
 	if (!isAdult) {
 		if (!formData.fullNameParent?.trim())
 			errors.fullNameParent = t("form.error.required");
-		if (!formData.signatureParent || formData.signatureParent === "")
+		if (!formData.signatureParent || formData.signatureParent === "") {
 			errors.signatureParent = t("form.error.required");
-		if (
-			formData.signatureParent &&
-			typeof formData.signatureParent === "string" &&
-			formData.signatureParent.startsWith("data:image/")
-		) {
-			const base64 = formData.signatureParent.split(",")[1] || "";
-			if ((base64.length * 3) / 4 > MAX_SIGNATURE_SIZE) {
-				errors.signatureParent = t("signature.errorSize", {
-					size: "1MB",
+		} else if (typeof formData.signatureParent === "string") {
+			const isAllowedType = ALLOWED_IMAGE_PREFIXES.some(
+				prefix =>
+					!!formData.signatureParent &&
+					formData.signatureParent.startsWith(prefix),
+			);
+			if (!isAllowedType) {
+				errors.signatureParent = t("signature.errorTypeAllowed", {
+					types: "PNG, JPEG",
 				});
+			} else {
+				const base64 = formData.signatureParent.split(",")[1] || "";
+				if ((base64.length * 3) / 4 > MAX_SIGNATURE_SIZE) {
+					errors.signatureParent = t("signature.errorSize", {
+						size: "1MB",
+					});
+				}
 			}
 		}
 	}
