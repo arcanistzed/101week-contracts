@@ -13,6 +13,7 @@ import SignatureField from "./SignatureField";
 import TextArea from "./TextArea";
 import TextInput from "./TextInput";
 
+const REQUIRE_PARTICIPANT_SIGNATURE_FOR_MINORS = true;
 const LOCAL_STORAGE_KEY = "101week-contracts.form.v1";
 const MAX_SIGNATURE_SIZE = 1024 * 1024; // 1MB
 const ALLOWED_IMAGE_PREFIXES = [
@@ -106,7 +107,7 @@ const validateParticipant = (
 	MAX_SIGNATURE_SIZE: number,
 ) => {
 	const errors: FormErrors = {};
-	if (isAdult) {
+	if (isAdult || (!isAdult && REQUIRE_PARTICIPANT_SIGNATURE_FOR_MINORS)) {
 		if (!formData.fullNameParticipant?.trim())
 			errors.fullNameParticipant = t("form.error.required");
 		if (

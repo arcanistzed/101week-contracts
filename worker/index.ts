@@ -5,6 +5,7 @@ export interface Env {
 
 import type { LookupResult, Submission } from "../src/types";
 
+const REQUIRE_PARTICIPANT_SIGNATURE_FOR_MINORS = true;
 const ALLOWED_IMAGE_PREFIXES = [
 	"data:image/png;base64,",
 	"data:image/jpeg;base64,",
@@ -104,7 +105,7 @@ export const handleFormPost = async (request: Request, env: Env) => {
 			}
 			isAdult = age >= 18;
 		}
-		if (isAdult) {
+		if (isAdult || (!isAdult && REQUIRE_PARTICIPANT_SIGNATURE_FOR_MINORS)) {
 			const participantFields: (keyof Submission)[] = [
 				"fullNameParticipant",
 				"signatureParticipant",
