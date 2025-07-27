@@ -1,6 +1,6 @@
 import { useState } from "react";
-import TextInput from "./components/TextInput";
 import SelectInput from "./components/SelectInput";
+import TextInput from "./components/TextInput";
 import type { LookupResult } from "./types";
 
 const RSG_OPT_IN = ["ESS"];
@@ -23,22 +23,6 @@ const FIELD_LABELS = {
 	accessibility: "Accessibility Requests",
 	fullNameParticipant: "Participant Full Name",
 	fullNameParent: "Parent Full Name",
-};
-
-type MigratedItem = {
-	key: string;
-	updatedFields: string[];
-	r2Paths: string[];
-};
-type SkippedItem = { key: string; reason: string };
-type MigrationReportType = {
-	mode: string;
-	totalScanned: number;
-	totalMigrated: number;
-	totalSkipped: number;
-	migrated: MigratedItem[];
-	skipped: SkippedItem[];
-	logs?: string[];
 };
 
 function LoadingSpinner() {
@@ -229,157 +213,7 @@ function Admin() {
 					</div>
 				)}
 			</form>
-			<MigrationTool />
 		</main>
-	);
-}
-
-function MigrationTool() {
-	const [loading, setLoading] = useState(false);
-	const [mode, setMode] = useState<"dry-run" | "commit">("dry-run");
-	const [report, setReport] = useState<MigrationReportType | null>(null);
-	const [error, setError] = useState<string | null>(null);
-
-	const handleMigrate = async () => {
-		setLoading(true);
-		setReport(null);
-		setError(null);
-		try {
-			const resp = await fetch(`/migrate-ess-prefix?mode=${mode}`, {
-				method: "POST",
-			});
-			if (!resp.ok) {
-				setError("Migration failed: " + (await resp.text()));
-				setReport(null);
-			} else {
-				const data = await resp.json();
-				setReport(data);
-			}
-		} catch {
-			setError("Migration request failed.");
-			setReport(null);
-		} finally {
-			setLoading(false);
-		}
-	};
-
-	return (
-		<div style={{ marginTop: 24 }}>
-			<div style={{ marginBottom: 8 }}>
-				<label htmlFor="migration-mode">Migration mode: </label>
-				<select
-					id="migration-mode"
-					value={mode}
-					onChange={e =>
-						setMode(e.target.value as "dry-run" | "commit")
-					}
-					disabled={loading}
-				>
-					<option value="dry-run">Dry Run (no changes)</option>
-					<option value="commit">Commit (migrate data)</option>
-				</select>
-			</div>
-			<button
-				type="button"
-				onClick={handleMigrate}
-				disabled={loading}
-				style={{
-					background: loading
-						? "#ccc"
-						: mode === "commit"
-						? "#27ae60"
-						: "#e67e22",
-					color: "#fff",
-					padding: "8px 16px",
-					borderRadius: 4,
-				}}
-			>
-				{loading ? `Running ${mode}...` : `Run Migration (${mode})`}
-			</button>
-			<div style={{ marginTop: 16 }}>
-				{error && (
-					<div style={{ color: "red", marginBottom: 8 }}>{error}</div>
-				)}
-				{report && <MigrationReport report={report} />}
-			</div>
-		</div>
-	);
-}
-
-function MigrationReport({ report }: { report: MigrationReportType }) {
-	return (
-		<div
-			style={{
-				maxHeight: 400,
-				overflow: "auto",
-				background: "#fafafa",
-				border: "1px solid #eee",
-				padding: 12,
-				borderRadius: 6,
-			}}
-		>
-			<h4 style={{ marginTop: 0 }}>Migration Report</h4>
-			<div>
-				<b>Mode:</b> {report.mode}
-			</div>
-			<div>
-				<b>Total Scanned:</b> {report.totalScanned}
-			</div>
-			<div>
-				<b>Total Migrated:</b> {report.totalMigrated}
-			</div>
-			<div>
-				<b>Total Skipped:</b> {report.totalSkipped}
-			</div>
-			{Array.isArray(report.logs) && report.logs.length > 0 && (
-				<details style={{ marginTop: 8 }}>
-					<summary style={{ cursor: "pointer" }}>
-						Show Logs ({report.logs.length})
-					</summary>
-					<pre
-						style={{
-							fontSize: 12,
-							whiteSpace: "pre-wrap",
-							margin: 0,
-						}}
-					>
-						{report.logs.join("\n")}
-					</pre>
-				</details>
-			)}
-			{Array.isArray(report.migrated) && report.migrated.length > 0 && (
-				<details style={{ marginTop: 8 }}>
-					<summary style={{ cursor: "pointer" }}>
-						Show Migrated ({report.migrated.length})
-					</summary>
-					<pre
-						style={{
-							fontSize: 12,
-							whiteSpace: "pre-wrap",
-							margin: 0,
-						}}
-					>
-						{JSON.stringify(report.migrated, null, 2)}
-					</pre>
-				</details>
-			)}
-			{Array.isArray(report.skipped) && report.skipped.length > 0 && (
-				<details style={{ marginTop: 8 }}>
-					<summary style={{ cursor: "pointer" }}>
-						Show Skipped ({report.skipped.length})
-					</summary>
-					<pre
-						style={{
-							fontSize: 12,
-							whiteSpace: "pre-wrap",
-							margin: 0,
-						}}
-					>
-						{JSON.stringify(report.skipped, null, 2)}
-					</pre>
-				</details>
-			)}
-		</div>
 	);
 }
 
