@@ -10,7 +10,7 @@ const ALLOWED_IMAGE_PREFIXES = [
 	"data:image/png;base64,",
 	"data:image/jpeg;base64,",
 ];
-const RSG_OPT_IN = ["ESS"];
+const RSG_OPT_IN = ["ESS", "SAFA"];
 
 const requiredFields: (keyof Submission)[] = [
 	"preferredLanguage",

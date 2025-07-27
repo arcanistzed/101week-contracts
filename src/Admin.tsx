@@ -3,7 +3,7 @@ import SelectInput from "./components/SelectInput";
 import TextInput from "./components/TextInput";
 import type { LookupResult } from "./types";
 
-const RSG_OPT_IN = ["ESS"];
+const RSG_OPT_IN = ["ESS", "SAFA"];
 const FIELD_LABELS = {
 	preferredLanguage: "Preferred Language",
 	firstName: "First Name",
