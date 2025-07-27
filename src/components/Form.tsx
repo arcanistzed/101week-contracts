@@ -12,6 +12,7 @@ import type { Submission } from "../types";
 import SignatureField from "./SignatureField";
 import TextArea from "./TextArea";
 import TextInput from "./TextInput";
+import SelectInput from "./SelectInput";
 
 const REQUIRE_PARTICIPANT_SIGNATURE_FOR_MINORS = true;
 const LOCAL_STORAGE_KEY = "101week-contracts.form.v1";
@@ -20,6 +21,7 @@ const ALLOWED_IMAGE_PREFIXES = [
 	"data:image/png;base64,",
 	"data:image/jpeg;base64,",
 ];
+const RSG_OPT_IN = ["ESS"];
 
 type FormField = keyof Omit<Submission, "preferredLanguage">;
 
@@ -31,7 +33,9 @@ interface FormContextType {
 	formData: typeof defaultFormData;
 	errors: FormErrors;
 	handleChange: (
-		e: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>,
+		e: ChangeEvent<
+			HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+		>,
 	) => void;
 	getErrorId: (name: FormField) => string | undefined;
 	today: string;
@@ -78,7 +82,11 @@ const validateBiographical = (
 const validateAcademic = (formData: typeof defaultFormData, t: TFunction) => {
 	const errors: FormErrors = {};
 	if (!formData.program.trim()) errors.program = t("form.error.required");
-	if (!formData.rsg1.trim()) errors.rsg1 = t("form.error.required");
+	if (!formData.rsg1.trim()) {
+		errors.rsg1 = t("form.error.required");
+	} else if (!RSG_OPT_IN.includes(formData.rsg1)) {
+		errors.rsg1 = t("form.academic.rsg.notOptedIn");
+	}
 	return errors;
 };
 
@@ -271,6 +279,12 @@ function BiographicalSection() {
 function AcademicSection() {
 	const { t } = useTranslation();
 	const { formData, errors, handleChange, getErrorId } = useFormContext();
+	const rsgOptions = Object.entries(
+		t("form.academic.rsg.list", { returnObjects: true }),
+	).map(([value, label]) => ({
+		value,
+		label: label as string,
+	}));
 	return (
 		<fieldset className="form-section">
 			<legend>{t("form.academic.title")}</legend>
@@ -289,10 +303,11 @@ function AcademicSection() {
 				<h3>{t("form.academic.rsg.question")}</h3>
 				<small>{t("form.academic.rsg.explanation")}</small>
 				<div className="columns">
-					<TextInput
+					<SelectInput
 						label={t("form.academic.rsg.1")}
 						name="rsg1"
 						value={formData.rsg1}
+						options={rsgOptions}
 						onChange={handleChange}
 						required
 						aria-required="true"
@@ -300,10 +315,11 @@ function AcademicSection() {
 						aria-describedby={getErrorId("rsg1")}
 					/>
 					<FieldErrorFor name="rsg1" />
-					<TextInput
+					<SelectInput
 						label={t("form.academic.rsg.2")}
 						name="rsg2"
 						value={formData.rsg2 ?? ""}
+						options={rsgOptions}
 						onChange={handleChange}
 					/>
 				</div>
@@ -566,7 +582,11 @@ function Form({ submitted, setSubmitted }: FormProps) {
 	const [submitting, setSubmitting] = useState(false);
 
 	const handleChange = useCallback(
-		(e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+		(
+			e: React.ChangeEvent<
+				HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+			>,
+		) => {
 			const { name, value } = e.target;
 			setFormData(prev => ({ ...prev, [name]: value }));
 		},

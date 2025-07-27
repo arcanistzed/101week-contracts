@@ -16,7 +16,28 @@
 				"1": "1st Recognized Student Government",
 				"2": "2nd Recognized Student Government (if applicable)",
 				"explanation": "Double major students can register in either or both RSG’s 101 Week. First Nations, Metis, and Inuits students can register in their program’s RSG and/or the Indigenous Students’ Association 101 Week",
-				"question": "With which Recognized Student Government(s) (RSG) did you register for 101 Week?"
+				"question": "With which Recognized Student Government(s) (RSG) did you register for 101 Week?",
+				"list": {
+					"ISA": "Indigenous Students’ Association",
+					"CSA-Comms": "Communication Students’ Association",
+					"SAFA": "Students’ Association of the Faculty of Arts",
+					"CSSA": "Computer Science Students' Association",
+					"ESS": "Engineering Students’ Society",
+					"HSSA": "Health Sciences Students' Association",
+					"UNSA": "Undergraduate Nursing Students' Association",
+					"HKSA": "Human Kinetics Students’ Association",
+					"SSA": "Science Students’ Association",
+					"CHRA": "Conflict Studies and Human Rights Association",
+					"CSA-Crim": "Criminology Students’ Association",
+					"ESA": "Economics Students' Association",
+					"FGSA": "Feminist and Gender Studies Students’ Association",
+					"DSA": "Development Students’ Association",
+					"IPPSSA": "International, Political and Policy Studies Students' Association",
+					"PSA": "Psychology Students’ Association",
+					"SASA": "Sociology and Anthropology Students’ Association",
+					"TSA": "Telfer Students’ Association"
+				},
+				"notOptedIn": "The selected RSG has not opted in to use this digital signature portal. Please contact them directly for their signature process."
 			}
 		},
 		"contact": {
@@ -84,7 +105,7 @@
 		"errorLength": "Signature must be {{max}} characters or fewer."
 	},
 	"meta": {
-		"title": "ESS 101 Week Digital Signature Portal",
-		"description": "Sign your ESS 101 Week contract digitally and securely."
+		"title": "101 Week Digital Signature Portal",
+		"description": "Sign your 101 Week contract digitally and securely."
 	}
 }

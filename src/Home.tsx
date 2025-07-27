@@ -2,7 +2,6 @@ import React, { useState, useEffect } from "react";
 import { useTranslation } from "react-i18next";
 import Form from "./components/Form";
 import PDFPreview from "./components/PDFPreview";
-import Logo from "./assets/ESS Logo.svg";
 
 function App() {
 	const { i18n, t } = useTranslation();
@@ -39,7 +38,6 @@ function App() {
 	return (
 		<div className="app">
 			<header className="header">
-				<img src={Logo} alt="ESS Logo" height={50} />
 				<h1>{t("title")}</h1>
 				<select
 					id="language-select"

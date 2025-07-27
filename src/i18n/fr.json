@@ -16,7 +16,28 @@
 				"1": "Gouvernement étudiant reconnu (1)",
 				"2": "Gouvernement étudiant reconnu (2)",
 				"explanation": "Les étudiant·e·s en double majeure peuvent s’inscrire à la Semaine 101 de l’un ou l’autre des GÉR, ou aux deux. Les étudiant·e·s des Premières Nations, Métis et Inuit peuvent s’inscrire à la Semaine 101 du GÉR de leur programme et/ou à celle de l’Association des étudiant·e·s autochtones.",
-				"question": "Auprès de quel(s) Gouvernement(s) étudiant(s) reconnu(s) (GÉR) vous êtes-vous inscrit·e pour la Semaine 101?"
+				"question": "Auprès de quel(s) Gouvernement(s) étudiant(s) reconnu(s) (GÉR) vous êtes-vous inscrit·e pour la Semaine 101?",
+				"list": {
+					"ISA": "Association des étudiant·e·s autochtones",
+					"CSA-Comms": "Association des étudiant·e·s en communication",
+					"SAFA": "Association étudiante de la Faculté des arts",
+					"CSSA": "Association des étudiant·e·s en informatique",
+					"ESS": "Association des étudiant·e·s en génie",
+					"HSSA": "Association des étudiant·e·s en sciences de la santé",
+					"UNSA": "Association d’étudiant·e·s pré-diplômé·e·s en sciences infirmières",
+					"HKSA": "Association des étudiant·e·s en sciences de l’activité physique",
+					"SSA": "Association des étudiant·e·s en sciences",
+					"CHRA": "Association des étudiant·e·s en études des conflits et droits humains",
+					"CSA-Crim": "Association des étudiant·e·s en criminologie",
+					"ESA": "Association des étudiant·e·s en sciences économiques",
+					"FGSA": "Association des étudiant·e·s en études féministes et de genre",
+					"DSA": "Association des étudiant·e·s en développement",
+					"IPPSSA": "Association étudiante des études internationales et politiques",
+					"PSA": "Association des étudiant·e·s en psychologie",
+					"SASA": "Association des étudiant·e·s en sociologie et anthropologie",
+					"TSA": "Association étudiante Telfer"
+				},
+				"notOptedIn": "Le GÉR sélectionné n’a pas opté pour utiliser ce portail de signature numérique. Veuillez les contacter directement pour leur processus de signature."
 			}
 		},
 		"contact": {
@@ -84,7 +105,7 @@
 		"errorLength": "La signature doit comporter {{max}} caractères ou moins."
 	},
 	"meta": {
-		"title": "Portail de signature numérique pour la Semaine 101 de l'AÉG",
-		"description": "Signez votre contrat pour la Semaine 101 de l'AÉG numériquement et en toute sécurité."
+		"title": "Portail de signature numérique pour la Semaine 101",
+		"description": "Signez votre contrat pour la Semaine 101 numériquement et en toute sécurité."
 	}
 }

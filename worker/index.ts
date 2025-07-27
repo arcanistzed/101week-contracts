@@ -3,13 +3,14 @@ export interface Env {
 	R2: R2Bucket;
 }
 
-import type { LookupResult, Submission } from "../src/types";
+import type { Submission, LookupResult } from "../src/types";
 
 const REQUIRE_PARTICIPANT_SIGNATURE_FOR_MINORS = true;
 const ALLOWED_IMAGE_PREFIXES = [
 	"data:image/png;base64,",
 	"data:image/jpeg;base64,",
 ];
+const RSG_OPT_IN = ["ESS"];
 
 const requiredFields: (keyof Submission)[] = [
 	"preferredLanguage",
@@ -138,13 +139,18 @@ export const handleFormPost = async (request: Request, env: Env) => {
 				}
 			}
 		}
-
+		const rsg = submission.rsg1;
+		if (!rsg || !RSG_OPT_IN.includes(rsg)) {
+			return new Response("Invalid or not opted-in RSG", {
+				status: 400,
+			});
+		}
 		const firstName = sanitize(submission.firstName);
 		const lastName = sanitize(submission.lastName);
 		const email = sanitize(submission.email);
 		const timestamp = Date.now();
-		const kvKey = `${firstName}_${lastName}_${timestamp}`;
-		const emailIndexKey = `email_${email}_${timestamp}`;
+		const kvKey = `${rsg}_${firstName}_${lastName}_${timestamp}`;
+		const emailIndexKey = `${rsg}_email_${email}_${timestamp}`;
 		await env._101WEEK_CONTRACTS_KV.put(emailIndexKey, kvKey);
 
 		// Save original base64 images for R2 upload, but only store R2 path in KV if image
@@ -195,7 +201,7 @@ export const handleFormPost = async (request: Request, env: Env) => {
 			)
 				? "png"
 				: "jpeg";
-			signaturePaths.signatureParticipant = `${kvKey}_participant.${ext}`;
+			signaturePaths.signatureParticipant = `${rsg}/${firstName}_${lastName}_${timestamp}_participant.${ext}`;
 			delete submission.signatureParticipant;
 		} else {
 			signaturePaths.signatureParticipant = null;
@@ -210,7 +216,7 @@ export const handleFormPost = async (request: Request, env: Env) => {
 			const ext = originalSignatureParent.startsWith("data:image/png")
 				? "png"
 				: "jpeg";
-			signaturePaths.signatureParent = `${kvKey}_parent.${ext}`;
+			signaturePaths.signatureParent = `${rsg}/${firstName}_${lastName}_${timestamp}_parent.${ext}`;
 			delete submission.signatureParent;
 		} else {
 			signaturePaths.signatureParent = null;
@@ -289,8 +295,9 @@ const handleLookup = async (request: Request, env: Env) => {
 	try {
 		const url = new URL(request.url);
 		const input = url.searchParams.get("input");
-		if (!input) {
-			return new Response("Missing 'input' query parameter", {
+		const rsg = url.searchParams.get("rsg");
+		if (!input || !rsg) {
+			return new Response("Missing 'rsg' or 'input' query parameter", {
 				status: 400,
 			});
 		}
@@ -299,7 +306,7 @@ const handleLookup = async (request: Request, env: Env) => {
 		if (emailRegex.test(input)) {
 			const normalized = sanitize(input);
 			const listResponse = await env._101WEEK_CONTRACTS_KV.list({
-				prefix: `email_${normalized}_`,
+				prefix: `${rsg}_email_${normalized}_`,
 			});
 			// Each value is a main record key
 			const mainKeys = await Promise.all(
@@ -343,7 +350,7 @@ const handleLookup = async (request: Request, env: Env) => {
 			}
 			const firstName = sanitize(parts[0]);
 			const lastName = sanitize(parts[1]);
-			const normalized = `${firstName}_${lastName}_`;
+			const normalized = `${rsg}_${firstName}_${lastName}_`;
 			const listResponse = await env._101WEEK_CONTRACTS_KV.list({
 				prefix: normalized,
 			});
@@ -369,6 +376,448 @@ export default {
 		}
 		if (url.pathname === "/lookup" && request.method === "GET") {
 			return await handleLookup(request, env);
+		}
+
+		// Migration endpoint: /migrate-ess-prefix?mode=dry-run|commit
+		if (
+			url.pathname === "/migrate-ess-prefix" &&
+			request.method === "POST"
+		) {
+			try {
+				const mode = url.searchParams.get("mode") || "dry-run";
+				let totalScanned = 0;
+				let totalMigrated = 0;
+				let totalSkipped = 0;
+				let cursor: string | undefined = undefined;
+				const logs: string[] = [];
+				const migrated: Array<{
+					oldKey: string;
+					newKey: string;
+					updatedFields: string[];
+					r2Paths: string[];
+				}> = [];
+				const skipped: Array<{ key: string; reason: string }> = [];
+				while (true) {
+					let listResp: {
+						keys: { name: string }[];
+						list_complete: boolean;
+						cursor?: string;
+					};
+					try {
+						listResp = await env._101WEEK_CONTRACTS_KV.list({
+							cursor,
+							limit: 1000,
+						});
+						logs.push(
+							`Listed KV keys batch (cursor=${
+								cursor ?? "start"
+							}), found ${listResp.keys.length}`,
+						);
+					} catch (err) {
+						const msg =
+							"KV list error: " +
+							(err instanceof Error ? err.message : String(err));
+						logs.push(msg);
+						return new Response(msg, { status: 500 });
+					}
+					for (const { name: key } of listResp.keys) {
+						totalScanned++;
+						if (
+							key.startsWith("ESS_") ||
+							((key.startsWith("email_") ||
+								key.includes("_email_")) &&
+								key.startsWith("ESS_"))
+						) {
+							logs.push(`Skipped already-prefixed key: ${key}`);
+							totalSkipped++;
+							skipped.push({ key, reason: "already prefixed" });
+							continue;
+						}
+						if (
+							key.startsWith("email_") ||
+							key.includes("_email_")
+						) {
+							let indexValue: string | null = null;
+							try {
+								indexValue =
+									await env._101WEEK_CONTRACTS_KV.get(key);
+							} catch (err) {
+								logs.push(
+									`Error fetching index key ${key}: ${
+										err instanceof Error
+											? err.message
+											: String(err)
+									}`,
+								);
+							}
+							if (!indexValue) {
+								logs.push(
+									`Index key ${key} missing value in KV`,
+								);
+								totalSkipped++;
+								skipped.push({ key, reason: "missing value" });
+								continue;
+							}
+							let indexNewKey = key;
+							if (!key.startsWith("ESS_")) {
+								indexNewKey = `ESS_${key}`;
+							}
+							if (mode === "commit") {
+								try {
+									await env._101WEEK_CONTRACTS_KV.put(
+										indexNewKey,
+										indexValue,
+									);
+									logs.push(
+										`Created new index KV key: ${indexNewKey}`,
+									);
+									await env._101WEEK_CONTRACTS_KV.delete(key);
+									logs.push(
+										`Deleted old index KV key: ${key}`,
+									);
+								} catch (err) {
+									logs.push(
+										`Error writing new index KV key ${indexNewKey}: ${
+											err instanceof Error
+												? err.message
+												: String(err)
+										}`,
+									);
+								}
+							} else {
+								logs.push(
+									`[dry-run] Would create new index KV key: ${indexNewKey} and delete old index KV key: ${key}`,
+								);
+							}
+							totalMigrated++;
+							migrated.push({
+								oldKey: key,
+								newKey: indexNewKey,
+								updatedFields: [],
+								r2Paths: [],
+							});
+							continue;
+						}
+						let mainValue: string | null = null;
+						try {
+							mainValue = await env._101WEEK_CONTRACTS_KV.get(
+								key,
+							);
+						} catch (err) {
+							logs.push(
+								`Error fetching key ${key}: ${
+									err instanceof Error
+										? err.message
+										: String(err)
+								}`,
+							);
+						}
+						if (!mainValue) {
+							logs.push(`Key ${key} missing value in KV`);
+							totalSkipped++;
+							skipped.push({ key, reason: "missing value" });
+							continue;
+						}
+						let mainParsed: Partial<Submission> &
+							Record<string, unknown>;
+						try {
+							mainParsed = JSON.parse(mainValue);
+						} catch (err) {
+							logs.push(
+								`Invalid JSON for key ${key}: ${
+									err instanceof Error
+										? err.message
+										: String(err)
+								}`,
+							);
+							totalSkipped++;
+							skipped.push({ key, reason: "invalid JSON" });
+							continue;
+						}
+						if (!isValidLookupData(mainParsed)) {
+							logs.push(
+								`Invalid data shape for key ${key}: ${JSON.stringify(
+									mainParsed,
+								)}`,
+							);
+							totalSkipped++;
+							skipped.push({ key, reason: "invalid data shape" });
+							continue;
+						}
+						if (!mainParsed || typeof mainParsed !== "object") {
+							logs.push(
+								`Parsed value for key ${key} is not an object: ${JSON.stringify(
+									mainParsed,
+								)}`,
+							);
+							totalSkipped++;
+							skipped.push({ key, reason: "not an object" });
+							continue;
+						}
+						if (!mainParsed.signaturePaths)
+							mainParsed.signaturePaths = {};
+						// Update rsg1 field
+						mainParsed.rsg1 = "ESS";
+						// Build new key by prefixing ESS_
+						let mainNewKey = key;
+						if (!key.startsWith("ESS_")) {
+							mainNewKey = `ESS_${key}`;
+						}
+						// Update R2 paths by prefixing ESS/
+						const mainUpdatedFields: string[] = [];
+						const mainR2Paths: string[] = [];
+						for (const field of [
+							"signatureParticipant",
+							"signatureParent",
+						] as const) {
+							const oldPath = mainParsed.signaturePaths[field];
+							if (typeof oldPath === "string") {
+								if (oldPath.startsWith("ESS/")) {
+									// Already prefixed, skip
+									continue;
+								}
+								const newPath = `ESS/${oldPath}`;
+								if (mode === "commit") {
+									try {
+										const obj = await env.R2.get(oldPath);
+										if (obj) {
+											await env.R2.put(
+												newPath,
+												await obj.arrayBuffer(),
+											);
+											await env.R2.delete(oldPath);
+											logs.push(
+												`Moved R2 image from ${oldPath} to ${newPath}`,
+											);
+											mainParsed.signaturePaths[field] =
+												newPath;
+											mainUpdatedFields.push(field);
+											mainR2Paths.push(newPath);
+										} else {
+											logs.push(
+												`R2 image not found: ${oldPath}`,
+											);
+										}
+									} catch (err) {
+										logs.push(
+											`Error moving R2 image ${oldPath}: ${
+												err instanceof Error
+													? err.message
+													: String(err)
+											}`,
+										);
+									}
+								} else {
+									logs.push(
+										`[dry-run] Would move R2 image from ${oldPath} to ${newPath}`,
+									);
+									mainUpdatedFields.push(field);
+									mainR2Paths.push(newPath);
+								}
+							}
+						}
+						// Write new KV key
+						if (mode === "commit") {
+							try {
+								await env._101WEEK_CONTRACTS_KV.put(
+									mainNewKey,
+									JSON.stringify(mainParsed),
+								);
+								logs.push(`Created new KV key: ${mainNewKey}`);
+								await env._101WEEK_CONTRACTS_KV.delete(key);
+								logs.push(`Deleted old KV key: ${key}`);
+							} catch (err) {
+								logs.push(
+									`Error writing new KV key ${mainNewKey}: ${
+										err instanceof Error
+											? err.message
+											: String(err)
+									}`,
+								);
+							}
+						} else {
+							logs.push(
+								`[dry-run] Would create new KV key: ${mainNewKey} and delete old KV key: ${key}`,
+							);
+						}
+						totalMigrated++;
+						migrated.push({
+							oldKey: key,
+							newKey: mainNewKey,
+							updatedFields: mainUpdatedFields,
+							r2Paths: mainR2Paths,
+						});
+						let value: string | null = null;
+						try {
+							value = await env._101WEEK_CONTRACTS_KV.get(key);
+						} catch (err) {
+							logs.push(
+								`Error fetching key ${key}: ${
+									err instanceof Error
+										? err.message
+										: String(err)
+								}`,
+							);
+						}
+						if (!value) {
+							logs.push(`Key ${key} missing value in KV`);
+							totalSkipped++;
+							skipped.push({ key, reason: "missing value" });
+							continue;
+						}
+						let parsed: Partial<Submission> &
+							Record<string, unknown>;
+						try {
+							parsed = JSON.parse(value);
+						} catch (err) {
+							logs.push(
+								`Invalid JSON for key ${key}: ${
+									err instanceof Error
+										? err.message
+										: String(err)
+								}`,
+							);
+							totalSkipped++;
+							skipped.push({ key, reason: "invalid JSON" });
+							continue;
+						}
+						if (!isValidLookupData(parsed)) {
+							logs.push(
+								`Invalid data shape for key ${key}: ${JSON.stringify(
+									parsed,
+								)}`,
+							);
+							totalSkipped++;
+							skipped.push({ key, reason: "invalid data shape" });
+							continue;
+						}
+						if (!parsed || typeof parsed !== "object") {
+							logs.push(
+								`Parsed value for key ${key} is not an object: ${JSON.stringify(
+									parsed,
+								)}`,
+							);
+							totalSkipped++;
+							skipped.push({ key, reason: "not an object" });
+							continue;
+						}
+						if (!parsed.signaturePaths) parsed.signaturePaths = {};
+						// Update rsg1 field
+						parsed.rsg1 = "ESS";
+						// Build new key by prefixing ESS_
+						let newKey = key;
+						if (!key.startsWith("ESS_")) {
+							newKey = `ESS_${key}`;
+						}
+						// Update R2 paths by prefixing ESS/
+						const updatedFields: string[] = [];
+						const r2Paths: string[] = [];
+						for (const field of [
+							"signatureParticipant",
+							"signatureParent",
+						] as const) {
+							const oldPath = parsed.signaturePaths[field];
+							if (
+								typeof oldPath === "string" &&
+								!oldPath.startsWith("ESS/")
+							) {
+								const newPath = `ESS/${oldPath}`;
+								if (mode === "commit") {
+									try {
+										const obj = await env.R2.get(oldPath);
+										if (obj) {
+											await env.R2.put(
+												newPath,
+												await obj.arrayBuffer(),
+											);
+											await env.R2.delete(oldPath);
+											logs.push(
+												`Moved R2 image from ${oldPath} to ${newPath}`,
+											);
+											parsed.signaturePaths[field] =
+												newPath;
+											updatedFields.push(field);
+											r2Paths.push(newPath);
+										} else {
+											logs.push(
+												`R2 image not found: ${oldPath}`,
+											);
+										}
+									} catch (err) {
+										logs.push(
+											`Error moving R2 image ${oldPath}: ${
+												err instanceof Error
+													? err.message
+													: String(err)
+											}`,
+										);
+									}
+								} else {
+									logs.push(
+										`[dry-run] Would move R2 image from ${oldPath} to ${newPath}`,
+									);
+									updatedFields.push(field);
+									r2Paths.push(newPath);
+								}
+							}
+						}
+						// Write new KV key
+						if (mode === "commit") {
+							try {
+								await env._101WEEK_CONTRACTS_KV.put(
+									newKey,
+									JSON.stringify(parsed),
+								);
+								logs.push(`Created new KV key: ${newKey}`);
+								await env._101WEEK_CONTRACTS_KV.delete(key);
+								logs.push(`Deleted old KV key: ${key}`);
+							} catch (err) {
+								logs.push(
+									`Error writing new KV key ${newKey}: ${
+										err instanceof Error
+											? err.message
+											: String(err)
+									}`,
+								);
+							}
+						} else {
+							logs.push(
+								`[dry-run] Would create new KV key: ${newKey} and delete old KV key: ${key}`,
+							);
+						}
+						totalMigrated++;
+						migrated.push({
+							oldKey: key,
+							newKey,
+							updatedFields,
+							r2Paths,
+						});
+					}
+					if (!listResp.list_complete) {
+						cursor = listResp.cursor;
+					} else {
+						break;
+					}
+				}
+				logs.push(
+					`Migration complete. Mode: ${mode}, Total scanned: ${totalScanned}, Migrated: ${totalMigrated}, Skipped: ${totalSkipped}`,
+				);
+				return new Response(
+					JSON.stringify({
+						mode,
+						totalScanned,
+						totalMigrated,
+						totalSkipped,
+						migrated,
+						skipped,
+						logs,
+					}),
+					{ headers: { "Content-Type": "application/json" } },
+				);
+			} catch (err) {
+				console.error("/migrate-ess-prefix error", err);
+				return new Response("Migration failed", { status: 500 });
+			}
 		}
 
 		return new Response("Method Not Allowed", { status: 405 });

@@ -1,4 +1,4 @@
-# ESS 101 Week Digital Signature Portal
+# 101 Week Digital Signature Portal
 
 This web app was developed for the [Engineering Students' Society](https://www.essaeg.ca/) to collect signatures from 101 Week participants.
 
