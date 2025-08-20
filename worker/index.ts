@@ -3,9 +3,6 @@ export interface Env {
 	R2: R2Bucket;
 }
 
-import type {
-	KVNamespaceListResult
-} from "@cloudflare/workers-types";
 import type { LookupResult, Submission } from "../src/types";
 
 const REQUIRE_PARTICIPANT_SIGNATURE_FOR_MINORS = true;
@@ -67,37 +64,6 @@ const fetchValidRecords = async (
 		}),
 	);
 	return results.filter((r): r is LookupResult => r !== null);
-};
-
-// Helper to clean up orphaned keys
-const cleanOrphanedKeys = async (
-	listResponse: KVNamespaceListResult<unknown>,
-	mainKeys: (string | null)[],
-	env: Env,
-): Promise<string[]> => {
-	const validMainKeys: string[] = [];
-	await Promise.all(
-		mainKeys.map(async (mainKey, idx) => {
-			if (!mainKey) return;
-			const value = await env._101WEEK_CONTRACTS_KV.get(mainKey);
-			if (!value) {
-				try {
-					await env._101WEEK_CONTRACTS_KV.delete(
-						listResponse.keys[idx].name,
-					);
-				} catch (err) {
-					console.error(
-						"Failed to delete orphaned email index key",
-						listResponse.keys[idx].name,
-						err,
-					);
-				}
-			} else {
-				validMainKeys.push(mainKey);
-			}
-		}),
-	);
-	return validMainKeys;
 };
 
 // Helper to build the prefix for lookup based on input and rsg
@@ -384,13 +350,11 @@ const handleLookup = async (request: Request, env: Env) => {
 					env._101WEEK_CONTRACTS_KV.get(keyObj.name),
 				),
 			);
-			const validMainKeys = await cleanOrphanedKeys(
-				listResponse,
-				mainKeys,
-				env,
+			const filteredMainKeys = mainKeys.filter(
+				(k): k is string => typeof k === "string",
 			);
 			return new Response(
-				JSON.stringify(await fetchValidRecords(validMainKeys, env)),
+				JSON.stringify(await fetchValidRecords(filteredMainKeys, env)),
 				{ headers: { "Content-Type": "application/json" } },
 			);
 		} else {
