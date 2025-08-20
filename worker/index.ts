@@ -3,6 +3,9 @@ export interface Env {
 	R2: R2Bucket;
 }
 
+import type {
+	KVNamespaceListResult
+} from "@cloudflare/workers-types";
 import type { LookupResult, Submission } from "../src/types";
 
 const REQUIRE_PARTICIPANT_SIGNATURE_FOR_MINORS = true;
@@ -25,12 +28,14 @@ const requiredFields: (keyof Submission)[] = [
 	"emergencyPhone",
 ] as const;
 
+// Helper to sanitize input strings
 const sanitize = (str: string) =>
 	str
 		.trim()
 		.toLowerCase()
 		.replace(/[^a-z0-9]/g, "_");
 
+// Helper to validate lookup data
 const isValidLookupData = (data: unknown): data is Submission => {
 	if (!data || typeof data !== "object" || Array.isArray(data)) return false;
 	return requiredFields.every(field => field in data);
@@ -64,6 +69,66 @@ const fetchValidRecords = async (
 	return results.filter((r): r is LookupResult => r !== null);
 };
 
+// Helper to clean up orphaned keys
+const cleanOrphanedKeys = async (
+	listResponse: KVNamespaceListResult<unknown>,
+	mainKeys: (string | null)[],
+	env: Env,
+): Promise<string[]> => {
+	const validMainKeys: string[] = [];
+	await Promise.all(
+		mainKeys.map(async (mainKey, idx) => {
+			if (!mainKey) return;
+			const value = await env._101WEEK_CONTRACTS_KV.get(mainKey);
+			if (!value) {
+				try {
+					await env._101WEEK_CONTRACTS_KV.delete(
+						listResponse.keys[idx].name,
+					);
+				} catch (err) {
+					console.error(
+						"Failed to delete orphaned email index key",
+						listResponse.keys[idx].name,
+						err,
+					);
+				}
+			} else {
+				validMainKeys.push(mainKey);
+			}
+		}),
+	);
+	return validMainKeys;
+};
+
+// Helper to build the prefix for lookup based on input and rsg
+const buildLookupPrefix = (
+	input: string,
+	rsg: string,
+): { prefix: string; isEmail: boolean } | { error: string } => {
+	const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+	const trimmedInput: string = input.trim();
+	const parts: string[] = trimmedInput.split(/\s+/);
+	if (emailRegex.test(trimmedInput)) {
+		const normalizedEmail: string = trimmedInput.toLowerCase();
+		return {
+			prefix: `${rsg}_email_${sanitize(normalizedEmail)}_`,
+			isEmail: true,
+		};
+	} else if (parts.length === 1) {
+		return { prefix: `${rsg}_${sanitize(parts[0])}_`, isEmail: false };
+	} else if (parts.length === 2) {
+		return {
+			prefix: `${rsg}_${sanitize(parts[0])}_${sanitize(parts[1])}_`,
+			isEmail: false,
+		};
+	} else {
+		return {
+			error: "Input must be a valid email, first name, or full name.",
+		};
+	}
+};
+
+// Handle the form submission
 export const handleFormPost = async (request: Request, env: Env) => {
 	try {
 		const submission = (await request.json()) as Submission;
@@ -291,76 +356,50 @@ export const handleFormPost = async (request: Request, env: Env) => {
 
 const MAX_RESULTS = 50;
 
+// Handle the lookup request
 const handleLookup = async (request: Request, env: Env) => {
 	try {
 		const url = new URL(request.url);
 		const input = url.searchParams.get("input");
 		const rsg = url.searchParams.get("rsg");
+
 		if (!input || !rsg) {
 			return new Response("Missing 'rsg' or 'input' query parameter", {
 				status: 400,
 			});
 		}
-		const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-		let results: LookupResult[] = [];
-		if (emailRegex.test(input)) {
-			const normalized = sanitize(input);
-			const listResponse = await env._101WEEK_CONTRACTS_KV.list({
-				prefix: `${rsg}_email_${normalized}_`,
-			});
-			// Each value is a main record key
-			const mainKeys = await Promise.all(
-				listResponse.keys.map(async keyObj => {
-					return await env._101WEEK_CONTRACTS_KV.get(keyObj.name);
-				}),
-			);
-			// Clean up orphaned index keys if main record is missing
-			const validMainKeys: string[] = [];
-			await Promise.all(
-				mainKeys.map(async (mainKey, idx) => {
-					if (!mainKey) return;
-					const value = await env._101WEEK_CONTRACTS_KV.get(mainKey);
-					if (!value) {
-						try {
-							await env._101WEEK_CONTRACTS_KV.delete(
-								listResponse.keys[idx].name,
-							);
-						} catch (err) {
-							console.error(
-								"Failed to delete orphaned email index key",
-								listResponse.keys[idx].name,
-								err,
-							);
-						}
-					} else {
-						validMainKeys.push(mainKey);
-					}
-				}),
-			);
-			results = await fetchValidRecords(validMainKeys, env);
-		} else {
-			const parts = input.trim().split(/\s+/);
-			if (parts.length !== 2) {
-				return new Response(
-					"Input must be a valid email or full name",
-					{
-						status: 400,
-					},
-				);
-			}
-			const firstName = sanitize(parts[0]);
-			const lastName = sanitize(parts[1]);
-			const normalized = `${rsg}_${firstName}_${lastName}_`;
-			const listResponse = await env._101WEEK_CONTRACTS_KV.list({
-				prefix: normalized,
-			});
-			const keys = listResponse.keys.map(k => k.name);
-			results = await fetchValidRecords(keys, env);
-		}
 
-		return new Response(JSON.stringify(results), {
-			headers: { "Content-Type": "application/json" },
+		const prefixResult = buildLookupPrefix(input, rsg);
+		if ("error" in prefixResult) {
+			return new Response(prefixResult.error, { status: 400 });
+		}
+		const { prefix, isEmail } = prefixResult;
+
+		const listResponse = await env._101WEEK_CONTRACTS_KV.list({
+			prefix,
 		});
+		if (isEmail) {
+			const mainKeys = await Promise.all(
+				listResponse.keys.map(keyObj =>
+					env._101WEEK_CONTRACTS_KV.get(keyObj.name),
+				),
+			);
+			const validMainKeys = await cleanOrphanedKeys(
+				listResponse,
+				mainKeys,
+				env,
+			);
+			return new Response(
+				JSON.stringify(await fetchValidRecords(validMainKeys, env)),
+				{ headers: { "Content-Type": "application/json" } },
+			);
+		} else {
+			const keys = listResponse.keys.map(k => k.name);
+			return new Response(
+				JSON.stringify(await fetchValidRecords(keys, env)),
+				{ headers: { "Content-Type": "application/json" } },
+			);
+		}
 	} catch (err) {
 		console.error("/lookup error", err);
 		return new Response("Internal Server Error", { status: 500 });
